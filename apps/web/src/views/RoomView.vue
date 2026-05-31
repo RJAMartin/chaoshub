@@ -6,10 +6,10 @@
       <div class="loading-text">Connecting to room…</div>
     </div>
 
-    <!-- Not in a room but arrived via URL: attempt auto-join -->
+    <!-- Not in a room yet: attempt auto-join via URL -->
     <div v-else-if="!roomStore.isInRoom && !autoJoinAttempted" class="room-loading">
       <div class="loading-spinner" />
-      <div class="loading-text">Joining room {{ route.params.id }}…</div>
+      <div class="loading-text">Joining room {{ route.params['id'] }}…</div>
     </div>
 
     <!-- Error -->
@@ -19,25 +19,23 @@
       <RouterLink to="/" class="btn btn-secondary">Back to Home</RouterLink>
     </div>
 
-    <!-- Active game -->
-    <div v-else-if="gameStore.sessionPhase === 'playing'" class="game-session">
-      <GameCanvas @ready="onCanvasReady" @destroyed="onCanvasDestroyed" />
-      <button class="leave-game-btn btn btn-danger" @click="gameStore.endGame()">End Game</button>
-    </div>
+    <!-- Active game session -->
+    <template v-else-if="gameStore.sessionPhase === 'playing' || gameStore.sessionPhase === 'loading'">
+      <div class="game-session">
+        <GameCanvas @ready="onCanvasReady" @destroyed="onCanvasDestroyed" />
+        <button class="leave-game-btn btn btn-danger" @click="gameStore.endGame()">End Game</button>
+      </div>
+    </template>
 
     <!-- Post-game -->
     <div v-else-if="gameStore.sessionPhase === 'ended'" class="post-game">
-      <div class="post-game-card card">
-        <div class="post-icon">🏆</div>
-        <h2>Game Over!</h2>
-        <button class="btn btn-primary" @click="gameStore.resetToLobby()">Back to Lobby</button>
-      </div>
+      <ScoreBoard :results="gameStore.lastResults" @play-again="restartGame" @back-to-lobby="gameStore.resetToLobby()" />
     </div>
 
     <!-- Lobby -->
     <div v-else-if="roomStore.isInRoom" class="lobby">
       <div class="lobby-inner">
-        <!-- Left: Players + Room Code -->
+        <!-- Left: Room info + player list -->
         <div class="lobby-left">
           <RoomCode :code="roomStore.roomCode!" />
 
@@ -51,7 +49,6 @@
             />
           </TransitionGroup>
 
-          <!-- Ready button (non-host) -->
           <button
             v-if="!roomStore.isHost"
             class="btn ready-btn"
@@ -64,28 +61,27 @@
 
         <!-- Right: Game picker + host controls -->
         <div class="lobby-right">
-          <div class="section-label">Select Game</div>
-          <div class="game-picker-grid">
+          <div class="section-label">Select a Game</div>
+
+          <div v-if="availableGames.length === 0" class="no-games">
+            No games available.
+          </div>
+          <div v-else class="game-picker-grid">
             <GameCard
               v-for="game in availableGames"
               :key="game.id"
               :game="game"
               :selected="roomStore.selectedGameId === game.id"
-              @select="roomStore.isHost ? roomStore.selectGame($event) : null"
+              @select="(id) => roomStore.isHost && roomStore.selectGame(id)"
             />
           </div>
 
-          <div v-if="availableGames.length === 0" class="no-games">
-            No games available yet.
-          </div>
-
-          <!-- Host controls -->
           <div v-if="roomStore.isHost" class="host-controls">
             <div class="host-badge">👑 You are the host</div>
             <button
               class="btn btn-primary start-btn"
               :disabled="!canStart"
-              @click="startGame"
+              @click="handleStartGame"
             >
               {{ startButtonLabel }}
             </button>
@@ -102,15 +98,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import type { Application } from 'pixi.js'
-import { useRoomStore, usePlayerStore, useGameStore } from '@/stores/index.js'
-import { gameRegistry } from '@/core/registry/index.js'
-import { networkAdapter } from '@/core/network/index.js'
-import { PlatformEvents } from '@/core/events/platform-events.js'
+import { useRoomStore, usePlayerStore, useGameStore } from '@/stores/index'
+import { gameRegistry } from '@/core/registry/index'
+import { networkAdapter } from '@/core/network/index'
+import { PlatformEvents } from '@/core/events/platform-events'
 import GameCanvas from '@/components/GameCanvas.vue'
 import PlayerCard from '@/components/PlayerCard.vue'
 import GameCard from '@/components/GameCard.vue'
 import RoomCode from '@/components/RoomCode.vue'
+import ScoreBoard from '@/components/ScoreBoard.vue'
 
 const route = useRoute()
 const roomStore = useRoomStore()
@@ -118,60 +114,77 @@ const playerStore = usePlayerStore()
 const gameStore = useGameStore()
 
 const autoJoinAttempted = ref(false)
+// Holds the Pixi Application created by <GameCanvas>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const pixiApp = ref<any>(null)
 
-// Auto-join if arrived via direct URL
+// ── Auto-join if arrived via direct URL ──────────────────────────────────────
 onMounted(async () => {
   if (!roomStore.isInRoom) {
     const code = route.params['id'] as string
     try {
       await roomStore.joinRoom(code)
     } catch {
-      // error is set on store
+      // error is set on the store
+    } finally {
+      autoJoinAttempted.value = true
     }
-    autoJoinAttempted.value = true
   }
 
-  // Host listens for clients requesting game start
-  if (networkAdapter.isHost()) {
-    networkAdapter.on(PlatformEvents.GAME_STARTED, (msg) => {
-      const payload = msg.payload as { gameId: string }
-      gameStore.startGame(payload.gameId)
-    })
-  }
+  // Host: listen for client-triggered game start
+  networkAdapter.on(PlatformEvents.GAME_STARTED, async (msg) => {
+    if (!networkAdapter.isHost()) return
+    const payload = msg.payload as { gameId: string }
+    if (pixiApp.value) {
+      await gameStore.startGame(payload.gameId, pixiApp.value)
+    }
+  })
 })
 
+// ── Computed ─────────────────────────────────────────────────────────────────
 const availableGames = computed(() => gameRegistry.list())
 
-const canStart = computed(() =>
-  !!roomStore.selectedGameId &&
-  (playerStore.players.length >= 1) &&
-  (playerStore.players.length <= 1 || playerStore.allReady || roomStore.isHost)
-)
+const canStart = computed(() => {
+  if (!roomStore.selectedGameId) return false
+  if (playerStore.players.length <= 1) return true // solo play allowed
+  return playerStore.allReady
+})
 
 const startButtonLabel = computed(() => {
   if (!roomStore.selectedGameId) return 'Select a game first'
-  if (!playerStore.allReady && playerStore.players.length > 1) return 'Waiting for players…'
+  if (!canStart.value && playerStore.players.length > 1) return 'Waiting for players…'
   return '▶ Start Game'
 })
 
+// ── Actions ──────────────────────────────────────────────────────────────────
 function toggleReady(): void {
   playerStore.setReady(!playerStore.localPlayer.isReady)
 }
 
-async function startGame(): Promise<void> {
-  if (!roomStore.selectedGameId) return
+async function handleStartGame(): Promise<void> {
+  if (!roomStore.selectedGameId || !pixiApp.value) return
   const gameId = roomStore.selectedGameId
-  // Broadcast to clients, then start locally
+  // Tell clients to start too
   networkAdapter.broadcast(PlatformEvents.GAME_STARTED, { gameId })
-  await gameStore.startGame(gameId)
+  await gameStore.startGame(gameId, pixiApp.value)
 }
 
-// Pixi canvas lifecycle
-function onCanvasReady(_app: Application): void {
-  // canvas is ready — game loop is already running via gameStore.startGame
+async function restartGame(): Promise<void> {
+  if (!roomStore.selectedGameId || !pixiApp.value) return
+  gameStore.resetToLobby()
+  const gameId = roomStore.selectedGameId
+  networkAdapter.broadcast(PlatformEvents.GAME_STARTED, { gameId })
+  await gameStore.startGame(gameId, pixiApp.value)
 }
+
+// ── Canvas lifecycle ─────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function onCanvasReady(app: any): void {
+  pixiApp.value = app
+}
+
 function onCanvasDestroyed(): void {
-  // cleanup if needed
+  pixiApp.value = null
 }
 </script>
 
@@ -200,7 +213,13 @@ function onCanvasDestroyed(): void {
 .error-msg { font-size: 0.9375rem; color: #ff6b6b; }
 
 /* Active game */
-.game-session { flex: 1; position: relative; display: flex; flex-direction: column; }
+.game-session {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .leave-game-btn {
   position: absolute;
   top: 0.75rem;
@@ -209,33 +228,44 @@ function onCanvasDestroyed(): void {
 }
 
 /* Post game */
-.post-game { flex: 1; display: flex; align-items: center; justify-content: center; }
-.post-game-card { text-align: center; max-width: 400px; width: 100%; }
-.post-icon { font-size: 3rem; margin-bottom: 1rem; }
-.post-game-card h2 { font-size: 1.75rem; font-weight: 800; margin: 0 0 1.5rem; }
+.post-game { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
 
 /* Lobby */
-.lobby { flex: 1; padding: 2rem 1.5rem; }
-.lobby-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 320px 1fr; gap: 2rem; }
+.lobby { flex: 1; padding: 2rem 1.5rem; overflow-y: auto; }
+.lobby-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 2rem;
+  align-items: start;
+}
 
-.lobby-left { display: flex; flex-direction: column; gap: 1rem; }
-.lobby-right { display: flex; flex-direction: column; gap: 1rem; }
+.lobby-left { display: flex; flex-direction: column; gap: 1rem; position: sticky; top: 0; }
+.lobby-right { display: flex; flex-direction: column; gap: 1.25rem; }
 
-.section-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); }
+.section-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
 
 .players-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.ready-btn { width: 100%; }
 
-.ready-btn { width: 100%; margin-top: 0.5rem; }
+.game-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.875rem;
+}
+.no-games { color: var(--color-text-muted); font-size: 0.875rem; }
 
-.game-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.875rem; }
-
-.no-games { color: var(--color-text-muted); font-size: 0.875rem; padding: 1rem 0; }
-
-.host-controls { margin-top: auto; display: flex; flex-direction: column; gap: 0.75rem; }
+.host-controls { display: flex; flex-direction: column; gap: 0.75rem; }
 .host-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-neon-yellow);
@@ -246,9 +276,10 @@ function onCanvasDestroyed(): void {
   width: fit-content;
 }
 .start-btn { padding: 0.875rem; font-size: 1rem; }
-.waiting-for-host { font-size: 0.8125rem; color: var(--color-text-muted); margin-top: auto; }
+.waiting-for-host { font-size: 0.8125rem; color: var(--color-text-muted); }
 
 @media (max-width: 768px) {
   .lobby-inner { grid-template-columns: 1fr; }
+  .lobby-left { position: static; }
 }
 </style>

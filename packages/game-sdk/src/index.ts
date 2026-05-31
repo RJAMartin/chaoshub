@@ -97,8 +97,18 @@ export interface AchievementAPI {
 // ---------------------------------------------------------------------------
 // Game Context — the single object games receive to interact with the platform
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Pixi Application — imported as a type-only reference so the SDK package
+// does not need pixi.js as a dependency. Games cast as needed.
+// ---------------------------------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type PixiApplication = any
+
 export interface GameContext {
   gameId: string
+  /** The PixiJS Application instance created by <GameCanvas>. Games MUST use
+   *  this instance — never create their own Application. */
+  pixiApp: PixiApplication
   network: NetworkAPI
   players: PlayerManager
   storage: StorageAPI

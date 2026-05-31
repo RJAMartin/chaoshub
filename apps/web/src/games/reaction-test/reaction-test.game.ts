@@ -4,20 +4,17 @@
 // Flow: waiting → countdown → ready (red) → SIGNAL (green) → results
 //
 // Host:
-//   - Manages state machine
-//   - Broadcasts state changes
-//   - Collects click timestamps
-//   - Ranks players, broadcasts results
+//   - Manages state machine + timers
+//   - Broadcasts state changes to all clients
+//   - Collects click timestamps, ranks players, broadcasts results
 //
 // Client:
-//   - Renders current state via Pixi
+//   - Renders current state in the shared Pixi app
 //   - Sends click timestamp to host on signal
 // ─────────────────────────────────────────────────────────────────────────────
-import type { Application, Graphics, Text } from 'pixi.js'
-import { Application as PixiApp, Graphics as PixiGraphics, Text as PixiText, TextStyle } from 'pixi.js'
+import { Graphics, Text, TextStyle, type Application } from 'pixi.js'
 import type { GameContext, GameInstance } from '@chaoshub/game-sdk'
 
-// Network event names (prefixed with game id)
 export const RT_EVENTS = {
   STATE_CHANGE: 'reaction-test:state-change',
   PLAYER_CLICKED: 'reaction-test:player-clicked',
@@ -30,7 +27,7 @@ export type RTState = 'waiting' | 'countdown' | 'ready' | 'signal' | 'false-star
 export interface RTResult {
   playerId: string
   playerName: string
-  reactionMs: number | null // null = false start or no click
+  reactionMs: number | null
   rank: number
 }
 
@@ -41,119 +38,130 @@ const MAX_SIGNAL_DELAY_MS = 5000
 
 export class ReactionTestGame implements GameInstance {
   private ctx: GameContext
-  private app: PixiApp | null = null
-  private bg!: PixiGraphics
-  private mainText!: PixiText
-  private subText!: PixiText
+  private app: Application
+
+  // Scene objects
+  private bg!: Graphics
+  private mainText!: Text
+  private subText!: Text
+  private countdownText!: Text
 
   // State
   private state: RTState = 'waiting'
   private currentRound = 0
   private signalTime: number | null = null
   private signalTimeout: ReturnType<typeof setTimeout> | null = null
-  private clickTimes = new Map<string, number>() // playerId → timestamp
+  private countdownInterval: ReturnType<typeof setInterval> | null = null
+  private clickTimes = new Map<string, number>()
   private falseStarters = new Set<string>()
-  private roundResults: RTResult[][] = []
   private hasClickedThisRound = false
+
+  // Network event callbacks stored for cleanup
+  private readonly onStateChange = (msg: { payload: unknown }) => {
+    if (this.ctx.network.isHost()) return
+    const payload = msg.payload as { state: RTState; round: number }
+    this.state = payload.state
+    this.currentRound = payload.round
+    this.hasClickedThisRound = false
+    this.renderState(payload.state)
+  }
+
+  private readonly onPlayerClicked = (msg: { payload: unknown }) => {
+    if (!this.ctx.network.isHost()) return
+    const payload = msg.payload as { playerId: string; timestamp: number }
+    this.recordClick(payload.playerId, payload.timestamp)
+  }
+
+  private readonly onResults = (msg: { payload: unknown }) => {
+    if (this.ctx.network.isHost()) return
+    const payload = msg.payload as { results: RTResult[]; round: number; final: boolean }
+    this.showResults(payload.results, payload.final)
+  }
+
+  private readonly onNextRound = (_msg: unknown) => {
+    if (this.ctx.network.isHost()) return
+    this.startCountdown()
+  }
 
   constructor(context: GameContext) {
     this.ctx = context
+    this.app = context.pixiApp as Application
   }
 
   async init(): Promise<void> {
-    // Create a Pixi application
-    this.app = new PixiApp()
-    await this.app.init({
-      backgroundColor: 0x0a0a0f,
-      resizeTo: document.querySelector('.game-canvas-container') as HTMLElement ?? window,
-      antialias: true,
-    })
-
-    // Attach canvas to the DOM container
-    const container = document.querySelector('.game-canvas-container')
-    if (container) container.appendChild(this.app.canvas)
-
     this.buildScene()
     this.registerNetworkListeners()
 
     if (this.ctx.network.isHost()) {
-      this.startCountdown()
+      // Small delay so clients have time to init their scene
+      setTimeout(() => this.startCountdown(), 500)
     }
   }
 
-  private buildScene(): void {
-    if (!this.app) return
+  // ── Scene ──────────────────────────────────────────────────────────────────
 
-    // Background
-    this.bg = new PixiGraphics()
+  private buildScene(): void {
+    const { width: w, height: h } = this.app.screen
+
+    this.bg = new Graphics()
     this.app.stage.addChild(this.bg)
 
-    // Main text
-    this.mainText = new PixiText({
+    this.mainText = new Text({
       text: '',
       style: new TextStyle({
-        fontFamily: 'Space Grotesk, Inter, sans-serif',
-        fontSize: 80,
+        fontFamily: '"Space Grotesk", Inter, sans-serif',
+        fontSize: Math.min(w * 0.12, 96),
         fontWeight: '900',
         fill: '#ffffff',
         align: 'center',
       }),
     })
     this.mainText.anchor.set(0.5)
+    this.mainText.position.set(w / 2, h / 2 - 40)
     this.app.stage.addChild(this.mainText)
 
-    // Sub text
-    this.subText = new PixiText({
+    this.subText = new Text({
       text: '',
       style: new TextStyle({
-        fontFamily: 'Space Grotesk, Inter, sans-serif',
-        fontSize: 24,
+        fontFamily: '"Space Grotesk", Inter, sans-serif',
+        fontSize: Math.min(w * 0.03, 22),
         fontWeight: '400',
         fill: '#9090b0',
         align: 'center',
       }),
     })
     this.subText.anchor.set(0.5)
+    this.subText.position.set(w / 2, h / 2 + 60)
     this.app.stage.addChild(this.subText)
+
+    this.countdownText = new Text({
+      text: '',
+      style: new TextStyle({
+        fontFamily: '"Space Grotesk", Inter, sans-serif',
+        fontSize: Math.min(w * 0.06, 48),
+        fontWeight: '700',
+        fill: '#ffd60a',
+        align: 'center',
+      }),
+    })
+    this.countdownText.anchor.set(0.5)
+    this.countdownText.position.set(w / 2, h / 2 + 120)
+    this.app.stage.addChild(this.countdownText)
 
     // Click handler
     this.app.canvas.addEventListener('click', this.handleClick)
-    this.app.canvas.addEventListener('touchstart', this.handleClick)
+    this.app.canvas.addEventListener('touchstart', this.handleClick, { passive: true })
 
     this.renderState('waiting')
   }
 
+  // ── Network ────────────────────────────────────────────────────────────────
+
   private registerNetworkListeners(): void {
-    this.ctx.network.on(RT_EVENTS.STATE_CHANGE, (msg) => {
-      const payload = msg.payload as { state: RTState; round: number }
-      if (!this.ctx.network.isHost()) {
-        this.state = payload.state
-        this.currentRound = payload.round
-        this.hasClickedThisRound = false
-        this.renderState(payload.state)
-      }
-    })
-
-    // Host receives click from client
-    this.ctx.network.on(RT_EVENTS.PLAYER_CLICKED, (msg) => {
-      if (!this.ctx.network.isHost()) return
-      const payload = msg.payload as { playerId: string; timestamp: number }
-      this.recordClick(payload.playerId, payload.timestamp)
-    })
-
-    // Client receives results
-    this.ctx.network.on(RT_EVENTS.RESULTS, (msg) => {
-      if (!this.ctx.network.isHost()) {
-        const payload = msg.payload as { results: RTResult[]; round: number; final: boolean }
-        this.showResults(payload.results, payload.final)
-      }
-    })
-
-    this.ctx.network.on(RT_EVENTS.NEXT_ROUND, (_msg) => {
-      if (!this.ctx.network.isHost()) {
-        this.startCountdown()
-      }
-    })
+    this.ctx.network.on(RT_EVENTS.STATE_CHANGE, this.onStateChange as never)
+    this.ctx.network.on(RT_EVENTS.PLAYER_CLICKED, this.onPlayerClicked as never)
+    this.ctx.network.on(RT_EVENTS.RESULTS, this.onResults as never)
+    this.ctx.network.on(RT_EVENTS.NEXT_ROUND, this.onNextRound as never)
   }
 
   // ── Host logic ─────────────────────────────────────────────────────────────
@@ -168,7 +176,20 @@ export class ReactionTestGame implements GameInstance {
     this.broadcastState('countdown')
     this.renderState('countdown')
 
-    setTimeout(() => this.showReady(), COUNTDOWN_MS)
+    let count = 3
+    this.countdownText.text = String(count)
+
+    this.countdownInterval = setInterval(() => {
+      count--
+      if (count > 0) {
+        this.countdownText.text = String(count)
+      } else {
+        clearInterval(this.countdownInterval!)
+        this.countdownInterval = null
+        this.countdownText.text = ''
+        this.showReady()
+      }
+    }, 1000)
   }
 
   private showReady(): void {
@@ -186,8 +207,8 @@ export class ReactionTestGame implements GameInstance {
     this.broadcastState('signal')
     this.renderState('signal')
 
-    // Auto-close round after 3 seconds if nobody clicked
-    setTimeout(() => {
+    // Auto-collect after 3s even if nobody clicked
+    this.signalTimeout = setTimeout(() => {
       if (this.state === 'signal') this.collectResults()
     }, 3000)
   }
@@ -207,14 +228,14 @@ export class ReactionTestGame implements GameInstance {
   }
 
   private recordClick(playerId: string, timestamp: number): void {
-    if (!this.ctx.network.isHost()) return
-
-    if (this.state === 'ready') {
-      // False start!
+    if (this.state === 'ready' || this.state === 'countdown') {
       this.falseStarters.add(playerId)
+      // Show false start locally if it's our own click
+      if (playerId === this.ctx.players.getLocalPlayer().id) {
+        this.renderState('false-start')
+      }
       return
     }
-
     if (this.state !== 'signal') return
     if (this.clickTimes.has(playerId)) return
     this.clickTimes.set(playerId, timestamp)
@@ -228,9 +249,10 @@ export class ReactionTestGame implements GameInstance {
       .map((p) => {
         const clickTime = this.clickTimes.get(p.id)
         const isFalseStart = this.falseStarters.has(p.id)
-        const reactionMs = isFalseStart || !clickTime || !this.signalTime
-          ? null
-          : clickTime - this.signalTime
+        const reactionMs =
+          !isFalseStart && clickTime && this.signalTime
+            ? clickTime - this.signalTime
+            : null
         return { playerId: p.id, playerName: p.name, reactionMs, rank: 0 }
       })
       .sort((a, b) => {
@@ -241,87 +263,84 @@ export class ReactionTestGame implements GameInstance {
       })
       .map((r, i) => ({ ...r, rank: i + 1 }))
 
-    this.roundResults.push(results)
     this.currentRound++
-
     const isFinal = this.currentRound >= TOTAL_ROUNDS
+
     this.ctx.network.broadcast(RT_EVENTS.RESULTS, { results, round: this.currentRound, final: isFinal })
     this.showResults(results, isFinal)
 
     if (!isFinal) {
-      setTimeout(() => {
+      this.signalTimeout = setTimeout(() => {
         this.ctx.network.broadcast(RT_EVENTS.NEXT_ROUND, {})
         this.startCountdown()
-      }, 3000)
+      }, 3500)
     } else {
       this.handleGameEnd(results)
     }
   }
 
-  private handleGameEnd(lastResults: RTResult[]): void {
-    const winner = lastResults[0]
-    if (winner) {
-      const localId = this.ctx.players.getLocalPlayer().id
-      if (winner.playerId === localId) {
-        this.ctx.stats.record('win')
-      } else {
-        this.ctx.stats.record('loss')
-      }
-    }
+  private handleGameEnd(results: RTResult[]): void {
+    const localId = this.ctx.players.getLocalPlayer().id
+    const myResult = results.find((r) => r.playerId === localId)
+    const winner = results[0]
     this.ctx.stats.record('play')
+    if (winner?.playerId === localId && myResult?.reactionMs !== null) {
+      this.ctx.stats.record('win')
+    } else if (myResult?.reactionMs !== null) {
+      this.ctx.stats.record('loss')
+    }
+
+    // Signal platform that game ended, carrying results for the ScoreBoard
+    this.ctx.events.emit('platform:game:ended', {
+      gameId: this.ctx.gameId,
+      winnerId: winner?.playerId,
+      durationMs: 0, // filled in by game.store
+      results,
+    })
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────────
 
   private renderState(state: RTState): void {
-    if (!this.app) return
-    const w = this.app.screen.width
-    const h = this.app.screen.height
+    const { width: w, height: h } = this.app.screen
 
-    this.mainText.position.set(w / 2, h / 2 - 30)
+    this.mainText.position.set(w / 2, h / 2 - 40)
     this.subText.position.set(w / 2, h / 2 + 60)
+    this.countdownText.position.set(w / 2, h / 2 + 120)
 
     this.bg.clear()
 
-    const configs: Record<RTState, { bg: number; main: string; sub: string }> = {
-      waiting: { bg: 0x0a0a0f, main: 'GET READY', sub: 'A round will start soon…' },
-      countdown: { bg: 0x0a0a0f, main: 'PREPARE!', sub: 'Watch for the signal…' },
-      ready: { bg: 0x1a0a0a, main: '⚠', sub: 'DO NOT CLICK YET' },
-      signal: { bg: 0x0a1a0a, main: 'CLICK!', sub: 'GO GO GO' },
-      'false-start': { bg: 0x1a0505, main: 'FALSE START!', sub: 'Too early…' },
-      results: { bg: 0x0a0a0f, main: 'RESULTS', sub: '' },
+    const configs: Record<RTState, { bg: number; main: string; sub: string; mainColor: string }> = {
+      waiting:      { bg: 0x0a0a0f, main: 'WAITING…',    sub: 'Get ready for the first round', mainColor: '#9090b0' },
+      countdown:    { bg: 0x0d0d1a, main: 'PREPARE',     sub: 'Watch for the signal — DO NOT CLICK', mainColor: '#ffd60a' },
+      ready:        { bg: 0x1a0808, main: '⚠ WAIT',      sub: 'Do not click yet!', mainColor: '#ff6b6b' },
+      signal:       { bg: 0x061a06, main: 'CLICK NOW!',  sub: 'As fast as you can!', mainColor: '#30d158' },
+      'false-start':{ bg: 0x1a0505, main: 'TOO EARLY!',  sub: 'False start — you are disqualified this round', mainColor: '#ff2d78' },
+      results:      { bg: 0x0a0a0f, main: 'RESULTS',     sub: '', mainColor: '#00f5ff' },
     }
 
-    const cfg = configs[state] ?? configs.waiting
+    const cfg = configs[state]
 
-    this.bg.rect(0, 0, w, h)
-    this.bg.fill(cfg.bg)
-
+    this.bg.rect(0, 0, w, h).fill(cfg.bg)
     this.mainText.text = cfg.main
     this.subText.text = cfg.sub
-
-    // Neon colors per state
-    const textColors: Record<RTState, string> = {
-      waiting: '#9090b0',
-      countdown: '#ffd60a',
-      ready: '#ff6b6b',
-      signal: '#30d158',
-      'false-start': '#ff2d78',
-      results: '#00f5ff',
-    }
-    ;(this.mainText.style as TextStyle).fill = textColors[state] ?? '#ffffff'
+    ;(this.mainText.style as TextStyle).fill = cfg.mainColor
   }
 
-  private showResults(results: RTResult[], _isFinal: boolean): void {
+  private showResults(results: RTResult[], isFinal: boolean): void {
     this.renderState('results')
-    if (!this.app) return
-    // Results are rendered in the sub-text as a simple list
-    const lines = results.slice(0, 5).map((r, i) => {
+    const lines = results.slice(0, 6).map((r) => {
+      const medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `${r.rank}.`
       const time = r.reactionMs !== null ? `${r.reactionMs}ms` : 'DNF'
-      return `${i + 1}. ${r.playerName}  ${time}`
+      return `${medal} ${r.playerName}  ${time}`
     })
+    if (isFinal) lines.unshift(`— FINAL RESULTS —\n`)
+    else lines.unshift(`— Round ${this.currentRound}/${TOTAL_ROUNDS} —\n`)
+
     this.subText.text = lines.join('\n')
-    ;(this.subText.style as TextStyle).fontSize = 18
+    ;(this.subText.style as TextStyle).fontSize = 17
+    ;(this.subText.style as TextStyle).lineHeight = 26
+    ;(this.subText.style as TextStyle).fill = '#c0c0e0'
   }
 
   private broadcastState(state: RTState): void {
@@ -334,20 +353,22 @@ export class ReactionTestGame implements GameInstance {
   // ── GameInstance lifecycle ─────────────────────────────────────────────────
 
   update(_deltaTime: number): void {
-    // Game logic is event-driven; no per-frame work needed beyond Pixi rendering
+    // All logic is event-driven and timer-based; no per-frame work needed
   }
 
   destroy(): void {
     if (this.signalTimeout) clearTimeout(this.signalTimeout)
-    this.ctx.network.off(RT_EVENTS.STATE_CHANGE, () => {})
-    this.ctx.network.off(RT_EVENTS.PLAYER_CLICKED, () => {})
-    this.ctx.network.off(RT_EVENTS.RESULTS, () => {})
-    this.ctx.network.off(RT_EVENTS.NEXT_ROUND, () => {})
-    if (this.app) {
-      this.app.canvas.removeEventListener('click', this.handleClick)
-      this.app.canvas.removeEventListener('touchstart', this.handleClick)
-      this.app.destroy(true, { children: true })
-      this.app = null
-    }
+    if (this.countdownInterval) clearInterval(this.countdownInterval)
+
+    this.ctx.network.off(RT_EVENTS.STATE_CHANGE, this.onStateChange as never)
+    this.ctx.network.off(RT_EVENTS.PLAYER_CLICKED, this.onPlayerClicked as never)
+    this.ctx.network.off(RT_EVENTS.RESULTS, this.onResults as never)
+    this.ctx.network.off(RT_EVENTS.NEXT_ROUND, this.onNextRound as never)
+
+    this.app.canvas.removeEventListener('click', this.handleClick)
+    this.app.canvas.removeEventListener('touchstart', this.handleClick)
+
+    // Clear stage (do NOT destroy the app — it belongs to <GameCanvas>)
+    this.app.stage.removeChildren()
   }
 }

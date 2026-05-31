@@ -50,7 +50,8 @@ export interface RoomErrorPayload { message: string }
 
 export interface GameSelectedPayload { gameId: string }
 export interface GameStartedPayload { gameId: string; startedAt: number }
-export interface GameEndedPayload { gameId: string; winnerId?: string; durationMs: number }
+export interface GameResult { playerId: string; playerName: string; reactionMs: number | null; rank: number }
+export interface GameEndedPayload { gameId: string; winnerId?: string; durationMs: number; results?: GameResult[] }
 
 export interface HostChangedPayload { previousHostId: string; newHostId: string }
 

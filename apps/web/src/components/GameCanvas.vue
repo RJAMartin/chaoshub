@@ -1,5 +1,5 @@
 <template>
-  <!-- GameCanvas: mounts PixiJS into a dedicated div. Vue never touches the canvas DOM node. -->
+  <!-- GameCanvas: owns the PixiJS Application. Vue never touches the canvas node directly. -->
   <div ref="containerRef" class="game-canvas-container" />
 </template>
 
@@ -21,7 +21,7 @@ onMounted(async () => {
   app = new Application()
   await app.init({
     resizeTo: containerRef.value,
-    backgroundColor: 0x0a0a0f,
+    background: 0x0a0a0f,
     antialias: true,
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
@@ -33,7 +33,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (app) {
-    app.destroy(true, { children: true })
+    app.destroy(true, { children: true, texture: true })
     app = null
     emit('destroyed')
   }
@@ -44,9 +44,11 @@ onUnmounted(() => {
 .game-canvas-container {
   width: 100%;
   height: 100%;
+  flex: 1;
   display: block;
   overflow: hidden;
   background-color: #0a0a0f;
+  min-height: 0;
 }
 
 .game-canvas-container :deep(canvas) {
