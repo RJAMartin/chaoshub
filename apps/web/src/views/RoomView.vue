@@ -249,7 +249,7 @@ function onCanvasDestroyed(): void {
 </script>
 
 <style scoped>
-.room-view { flex: 1; display: flex; flex-direction: column; }
+.room-view { flex: 1; display: flex; flex-direction: column; position: relative; min-height: 0; }
 
 .room-loading, .room-error {
   flex: 1;
@@ -272,15 +272,14 @@ function onCanvasDestroyed(): void {
 .error-icon { font-size: 2.5rem; }
 .error-msg { font-size: 0.9375rem; color: #ff6b6b; }
 
-/* Active game */
+/* Active game — fills the room-view absolutely so canvas always gets full dimensions */
 .game-session {
-  flex: 1;
-  position: relative;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
-/* Hidden when in lobby — canvas stays at full size so app.screen is correct when init() runs */
+/* Hidden when in lobby — still position:fixed at full viewport so app.screen is correct */
 .game-session--hidden {
   position: fixed !important;
   top: 0; left: 0; right: 0; bottom: 0;

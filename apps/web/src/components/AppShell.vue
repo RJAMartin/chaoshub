@@ -15,11 +15,13 @@ import AppNav from './AppNav.vue'
 .app-shell {
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-height: 100vh;
 }
 .app-main {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0; /* allow flex children to shrink below content size */
 }
 </style>
