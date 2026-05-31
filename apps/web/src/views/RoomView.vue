@@ -12,6 +12,19 @@
       </div>
     </Transition>
 
+    <!--
+      GameCanvas is ALWAYS mounted once we are in a room so that pixiApp is
+      available before startGame() is called. Visibility is toggled via CSS.
+    -->
+    <div
+      v-if="roomStore.isInRoom"
+      class="game-session"
+      :class="{ 'game-session--hidden': !isPlaying }"
+    >
+      <GameCanvas @ready="onCanvasReady" @destroyed="onCanvasDestroyed" />
+      <button v-if="isPlaying" class="leave-game-btn btn btn-danger" @click="gameStore.endGame()">End Game</button>
+    </div>
+
     <!-- Loading / joining -->
     <div v-if="roomStore.isConnecting" class="room-loading">
       <div class="loading-spinner" />
@@ -31,21 +44,13 @@
       <RouterLink to="/" class="btn btn-secondary">Back to Home</RouterLink>
     </div>
 
-    <!-- Active game session -->
-    <template v-else-if="gameStore.sessionPhase === 'playing' || gameStore.sessionPhase === 'loading'">
-      <div class="game-session">
-        <GameCanvas @ready="onCanvasReady" @destroyed="onCanvasDestroyed" />
-        <button class="leave-game-btn btn btn-danger" @click="gameStore.endGame()">End Game</button>
-      </div>
-    </template>
-
-    <!-- Post-game -->
+    <!-- Post-game results -->
     <div v-else-if="gameStore.sessionPhase === 'ended'" class="post-game">
       <ScoreBoard :results="gameStore.lastResults" @play-again="restartGame" @back-to-lobby="gameStore.resetToLobby()" />
     </div>
 
     <!-- Lobby -->
-    <div v-else-if="roomStore.isInRoom" class="lobby">
+    <div v-else-if="roomStore.isInRoom && !isPlaying" class="lobby">
       <div class="lobby-inner">
         <!-- Left: Room info + player list -->
         <div class="lobby-left">
@@ -92,7 +97,7 @@
             <div class="host-badge">👑 You are the host</div>
             <button
               class="btn btn-primary start-btn"
-              :disabled="!canStart"
+              :disabled="!canStart || !pixiApp"
               @click="handleStartGame"
             >
               {{ startButtonLabel }}
@@ -185,6 +190,10 @@ onUnmounted(() => {
 // ── Computed ─────────────────────────────────────────────────────────────────
 const availableGames = computed(() => gameRegistry.list())
 
+const isPlaying = computed(() =>
+  gameStore.sessionPhase === 'playing' || gameStore.sessionPhase === 'loading'
+)
+
 const canStart = computed(() => {
   if (!roomStore.selectedGameId) return false
   if (playerStore.players.length <= 1) return true // solo play allowed
@@ -192,6 +201,7 @@ const canStart = computed(() => {
 })
 
 const startButtonLabel = computed(() => {
+  if (!pixiApp.value) return 'Initializing…'
   if (!roomStore.selectedGameId) return 'Select a game first'
   if (!canStart.value && playerStore.players.length > 1) return 'Waiting for players…'
   return '▶ Start Game'
@@ -260,6 +270,15 @@ function onCanvasDestroyed(): void {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+/* Hidden when in lobby — canvas stays mounted but takes no space */
+.game-session--hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 .leave-game-btn {
   position: absolute;
