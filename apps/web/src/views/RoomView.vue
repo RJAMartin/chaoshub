@@ -12,21 +12,14 @@
       </div>
     </Transition>
 
-    <!--
-      GameCanvas is ALWAYS mounted once we are in a room so that pixiApp is
-      available before startGame() is called. Visibility is toggled via CSS.
-    -->
-    <div
-      v-if="roomStore.isInRoom"
-      class="game-session"
-      :class="{ 'game-session--hidden': !isPlaying }"
-    >
+    <!-- Active game session: GameCanvas mounts here, filling the room-view -->
+    <div v-if="isPlaying" class="game-session">
       <GameCanvas @ready="onCanvasReady" @destroyed="onCanvasDestroyed" />
-      <button v-if="isPlaying" class="leave-game-btn btn btn-danger" @click="gameStore.endGame()">End Game</button>
+      <button class="leave-game-btn btn btn-danger" @click="gameStore.endGame()">End Game</button>
     </div>
 
     <!-- Loading / joining -->
-    <div v-if="roomStore.isConnecting" class="room-loading">
+    <div v-else-if="roomStore.isConnecting" class="room-loading">
       <div class="loading-spinner" />
       <div class="loading-text">Connecting to room…</div>
     </div>
@@ -50,7 +43,7 @@
     </div>
 
     <!-- Lobby -->
-    <div v-else-if="roomStore.isInRoom && !isPlaying" class="lobby">
+    <div v-else-if="roomStore.isInRoom" class="lobby">
       <div class="lobby-inner">
         <!-- Left: Room info + player list -->
         <div class="lobby-left">
@@ -97,7 +90,7 @@
             <div class="host-badge">👑 You are the host</div>
             <button
               class="btn btn-primary start-btn"
-              :disabled="!canStart || !pixiApp"
+              :disabled="!canStart"
               @click="handleStartGame"
             >
               {{ startButtonLabel }}
@@ -113,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRoomStore, usePlayerStore, useGameStore } from '@/stores/index'
 import { gameRegistry } from '@/core/registry/index'
@@ -133,9 +126,9 @@ const playerStore = usePlayerStore()
 const gameStore = useGameStore()
 
 const autoJoinAttempted = ref(false)
-// Holds the Pixi Application created by <GameCanvas>
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pixiApp = ref<any>(null)
+
+// Which game to launch once GameCanvas emits 'ready'
+let pendingGameId: string | null = null
 
 // Host-disconnect state
 const disconnected = ref(false)
@@ -143,7 +136,7 @@ const redirectCountdown = ref(5)
 let redirectTimer: ReturnType<typeof setInterval> | null = null
 
 const handleRoomClosed = () => {
-  if (roomStore.isHost) return // host left intentionally — no overlay needed
+  if (roomStore.isHost) return
   disconnected.value = true
   redirectCountdown.value = 5
   redirectTimer = setInterval(() => {
@@ -172,13 +165,12 @@ onMounted(async () => {
     }
   }
 
-  // Host: listen for client-triggered game start
-  networkAdapter.on(PlatformEvents.GAME_STARTED, async (msg) => {
-    if (!networkAdapter.isHost()) return
+  // Non-host clients: host broadcasts GAME_STARTED → set pendingGameId, canvas mounts, then onCanvasReady fires
+  networkAdapter.on(PlatformEvents.GAME_STARTED, (msg) => {
+    if (networkAdapter.isHost()) return
     const payload = msg.payload as { gameId: string }
-    if (pixiApp.value) {
-      await gameStore.startGame(payload.gameId, pixiApp.value)
-    }
+    pendingGameId = payload.gameId
+    gameStore.setLoading(payload.gameId)
   })
 })
 
@@ -196,12 +188,11 @@ const isPlaying = computed(() =>
 
 const canStart = computed(() => {
   if (!roomStore.selectedGameId) return false
-  if (playerStore.players.length <= 1) return true // solo play allowed
+  if (playerStore.players.length <= 1) return true
   return playerStore.allReady
 })
 
 const startButtonLabel = computed(() => {
-  if (!pixiApp.value) return 'Initializing…'
   if (!roomStore.selectedGameId) return 'Select a game first'
   if (!canStart.value && playerStore.players.length > 1) return 'Waiting for players…'
   return '▶ Start Game'
@@ -212,39 +203,37 @@ function toggleReady(): void {
   playerStore.setReady(!playerStore.localPlayer.isReady)
 }
 
-async function handleStartGame(): Promise<void> {
-  if (!roomStore.selectedGameId || !pixiApp.value) return
+function handleStartGame(): void {
+  if (!roomStore.selectedGameId) return
   const gameId = roomStore.selectedGameId
-  // Tell clients to start too
   networkAdapter.broadcast(PlatformEvents.GAME_STARTED, { gameId })
-  // Set phase to 'loading' first so the canvas becomes visible (removes --hidden),
-  // then wait a tick for the browser to resize the canvas before init() reads app.screen
+  pendingGameId = gameId
+  // Setting phase to 'loading' mounts <GameCanvas>; onCanvasReady fires once it's ready
   gameStore.setLoading(gameId)
-  await nextTick()
-  // Small extra delay lets ResizeObserver / Pixi's resizeTo settle
-  await new Promise(r => setTimeout(r, 50))
-  await gameStore.startGame(gameId, pixiApp.value)
 }
 
-async function restartGame(): Promise<void> {
-  if (!roomStore.selectedGameId || !pixiApp.value) return
+function restartGame(): void {
+  if (!roomStore.selectedGameId) return
   const gameId = roomStore.selectedGameId
   gameStore.resetToLobby()
   networkAdapter.broadcast(PlatformEvents.GAME_STARTED, { gameId })
+  pendingGameId = gameId
   gameStore.setLoading(gameId)
-  await nextTick()
-  await new Promise(r => setTimeout(r, 50))
-  await gameStore.startGame(gameId, pixiApp.value)
 }
 
 // ── Canvas lifecycle ─────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function onCanvasReady(app: any): void {
-  pixiApp.value = app
+async function onCanvasReady(app: any): Promise<void> {
+  // Canvas is now mounted at full size — safe to init the game
+  if (pendingGameId) {
+    const gameId = pendingGameId
+    pendingGameId = null
+    await gameStore.startGame(gameId, app)
+  }
 }
 
 function onCanvasDestroyed(): void {
-  pixiApp.value = null
+  // nothing to clear — pixiApp is local to onCanvasReady now
 }
 </script>
 
@@ -272,20 +261,12 @@ function onCanvasDestroyed(): void {
 .error-icon { font-size: 2.5rem; }
 .error-msg { font-size: 0.9375rem; color: #ff6b6b; }
 
-/* Active game — fills the room-view absolutely so canvas always gets full dimensions */
+/* Active game — fills the room-view so canvas gets full dimensions */
 .game-session {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
-}
-/* Hidden when in lobby — still position:fixed at full viewport so app.screen is correct */
-.game-session--hidden {
-  position: fixed !important;
-  top: 0; left: 0; right: 0; bottom: 0;
-  visibility: hidden;
-  pointer-events: none;
-  z-index: -1;
 }
 .leave-game-btn {
   position: absolute;
