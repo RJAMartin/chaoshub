@@ -20,7 +20,7 @@ class GameRegistry {
 
     // Eagerly import all module.ts files under src/games/
     const moduleFiles = import.meta.glob<{ default: GameModule }>(
-      '../games/*/module.ts',
+      '../../games/*/module.ts',
       { eager: true }
     )
 
