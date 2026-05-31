@@ -1,8 +1,59 @@
 # ChaosHub — Progress Log
 
-## Status: Phase 0–4 Complete (Initial Foundation)
+## Status: Live at https://rjamartin.github.io/chaoshub/
 
-Last updated: Session 1
+Last updated: Session 2
+
+---
+
+## Completed
+
+### Session 1 — Foundation (Phases 0–5)
+- [x] pnpm monorepo, Vite + Vue 3 + TypeScript + Tailwind v4
+- [x] Full core systems: EventBus, GameRegistry, GameLoop, NetworkAPI (PeerJS), StorageAPI, PlayerManager, StatisticsService, AchievementEngine, GameContext factory
+- [x] Pinia stores: room, players, game, profile, achievements, statistics
+- [x] Vue Router (hash history, 5 routes)
+- [x] All views + components (lobby, game session, profile, etc.)
+- [x] Reaction Test game (first playable)
+- [x] pnpm create-game CLI scaffold
+- [x] .opencode/ skill files
+
+### Session 2 — Fix, Polish, Deploy
+- [x] Fixed Pixi double-init: GameCanvas owns Application, passes via context.pixiApp
+- [x] ScoreBoard component (post-game results with medals)
+- [x] Google Fonts (Space Grotesk + JetBrains Mono)
+- [x] Favicon SVG (neon lightning bolt)
+- [x] Ball Push game (Matter.js physics, host-authority, keyboard input)
+- [x] GitHub repo created: https://github.com/RJAMartin/chaoshub
+- [x] GitHub Pages live: https://rjamartin.github.io/chaoshub/
+- [x] CI/CD: push to main → live in ~40 seconds
+
+---
+
+## Pending / Next Session
+
+### High Priority
+- [ ] Pixel War game (shared canvas, realtime territory claiming)
+- [ ] Collaborative Music Toy game (Web Audio API, no win condition)
+- [ ] Mobile touch controls for Ball Push (on-screen up/down buttons)
+- [ ] `<CountdownOverlay>` Vue component for pre-game (currently done in Pixi per-game)
+- [ ] Invite link: /?join=CODE query param auto-triggers join flow
+
+### Medium Priority
+- [ ] VSCode workspace settings + recommended extensions
+- [ ] ESLint flat config
+- [ ] Unit tests (EventBus, GameRegistry, AchievementEngine)
+- [ ] Error boundary: host disconnects mid-game → UI feedback + redirect
+
+### Low Priority / Future
+- [ ] Spectator mode, host migration, PWA, Supabase, tournaments...
+
+---
+
+## Known Issues
+- Ball Push: no touch/mobile input yet (keyboard only)
+- Node.js 20 deprecation warnings in CI (harmless until Sept 2026)
+
 
 ---
 

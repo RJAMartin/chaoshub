@@ -1,5 +1,17 @@
 <template>
   <div class="room-view">
+    <!-- Host disconnected overlay -->
+    <Transition name="fade">
+      <div v-if="disconnected" class="disconnect-overlay">
+        <div class="disconnect-box">
+          <div class="disconnect-icon">🔌</div>
+          <div class="disconnect-title">Host Disconnected</div>
+          <div class="disconnect-msg">The host left the room. Returning to home in {{ redirectCountdown }}s…</div>
+          <RouterLink to="/" class="btn btn-primary" @click="disconnected = false">Go Home Now</RouterLink>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Loading / joining -->
     <div v-if="roomStore.isConnecting" class="room-loading">
       <div class="loading-spinner" />
@@ -96,11 +108,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useRoomStore, usePlayerStore, useGameStore } from '@/stores/index'
 import { gameRegistry } from '@/core/registry/index'
 import { networkAdapter } from '@/core/network/index'
+import { eventBus } from '@/core/events/event-bus'
 import { PlatformEvents } from '@/core/events/platform-events'
 import GameCanvas from '@/components/GameCanvas.vue'
 import PlayerCard from '@/components/PlayerCard.vue'
@@ -109,6 +122,7 @@ import RoomCode from '@/components/RoomCode.vue'
 import ScoreBoard from '@/components/ScoreBoard.vue'
 
 const route = useRoute()
+const router = useRouter()
 const roomStore = useRoomStore()
 const playerStore = usePlayerStore()
 const gameStore = useGameStore()
@@ -118,8 +132,30 @@ const autoJoinAttempted = ref(false)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const pixiApp = ref<any>(null)
 
+// Host-disconnect state
+const disconnected = ref(false)
+const redirectCountdown = ref(5)
+let redirectTimer: ReturnType<typeof setInterval> | null = null
+
+const handleRoomClosed = () => {
+  if (roomStore.isHost) return // host left intentionally — no overlay needed
+  disconnected.value = true
+  redirectCountdown.value = 5
+  redirectTimer = setInterval(() => {
+    redirectCountdown.value--
+    if (redirectCountdown.value <= 0) {
+      clearInterval(redirectTimer!)
+      redirectTimer = null
+      roomStore.leaveRoom()
+      router.push('/')
+    }
+  }, 1000)
+}
+
 // ── Auto-join if arrived via direct URL ──────────────────────────────────────
 onMounted(async () => {
+  eventBus.on(PlatformEvents.ROOM_CLOSED, handleRoomClosed)
+
   if (!roomStore.isInRoom) {
     const code = route.params['id'] as string
     try {
@@ -139,6 +175,11 @@ onMounted(async () => {
       await gameStore.startGame(payload.gameId, pixiApp.value)
     }
   })
+})
+
+onUnmounted(() => {
+  eventBus.off(PlatformEvents.ROOM_CLOSED, handleRoomClosed)
+  if (redirectTimer) clearInterval(redirectTimer)
 })
 
 // ── Computed ─────────────────────────────────────────────────────────────────
@@ -282,4 +323,35 @@ function onCanvasDestroyed(): void {
   .lobby-inner { grid-template-columns: 1fr; }
   .lobby-left { position: static; }
 }
+
+/* Disconnect overlay */
+.disconnect-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 15, 0.85);
+  backdrop-filter: blur(6px);
+}
+.disconnect-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2.5rem 3rem;
+  background: var(--color-surface);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 0 40px rgba(255, 45, 120, 0.2);
+  text-align: center;
+  max-width: 380px;
+}
+.disconnect-icon { font-size: 3rem; }
+.disconnect-title { font-size: 1.25rem; font-weight: 800; color: #ff6b6b; }
+.disconnect-msg { font-size: 0.875rem; color: var(--color-text-secondary); }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

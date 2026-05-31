@@ -71,6 +71,8 @@ export class BallPushGame implements GameInstance {
   private gNet!: Graphics
   private scoreText!: Text
   private statusText!: Text
+  private touchUpBtn!: Graphics
+  private touchDownBtn!: Graphics
 
   // Physics (host only)
   private engine?: Matter.Engine
@@ -204,6 +206,9 @@ export class BallPushGame implements GameInstance {
     this.statusText.position.set(LOGIC_W / 2, LOGIC_H / 2 - 60)
     this.stage.addChild(this.statusText)
 
+    // Touch controls (visible on touch devices, semi-transparent on desktop)
+    this.buildTouchControls()
+
     // Scale stage to fit canvas
     this.scaleStage()
 
@@ -211,6 +216,47 @@ export class BallPushGame implements GameInstance {
     this.gP1.position.set(PADDLE_MARGIN, LOGIC_H / 2)
     this.gP2.position.set(LOGIC_W - PADDLE_MARGIN, LOGIC_H / 2)
     this.gBall.position.set(LOGIC_W / 2, LOGIC_H / 2)
+  }
+
+  private buildTouchControls(): void {
+    const BTN_W = 80
+    const BTN_H = 60
+    const BTN_X = LOGIC_W - BTN_W - 8
+    const BTN_ALPHA = 0.35
+
+    // UP button
+    this.touchUpBtn = new Graphics()
+    this.touchUpBtn
+      .roundRect(0, 0, BTN_W, BTN_H, 10)
+      .fill({ color: 0x4d96ff, alpha: BTN_ALPHA })
+    const upArrow = new Text({ text: '▲', style: new TextStyle({ fontSize: 28, fill: '#ffffff', fontFamily: 'sans-serif' }) })
+    upArrow.anchor.set(0.5)
+    upArrow.position.set(BTN_W / 2, BTN_H / 2)
+    this.touchUpBtn.addChild(upArrow)
+    this.touchUpBtn.position.set(BTN_X, LOGIC_H / 2 - BTN_H - 8)
+    this.touchUpBtn.eventMode = 'static'
+    this.touchUpBtn.cursor = 'pointer'
+    this.touchUpBtn.on('pointerdown', () => this.keysDown.add('ArrowUp'))
+    this.touchUpBtn.on('pointerup', () => this.keysDown.delete('ArrowUp'))
+    this.touchUpBtn.on('pointerupoutside', () => this.keysDown.delete('ArrowUp'))
+    this.stage.addChild(this.touchUpBtn)
+
+    // DOWN button
+    this.touchDownBtn = new Graphics()
+    this.touchDownBtn
+      .roundRect(0, 0, BTN_W, BTN_H, 10)
+      .fill({ color: 0x4d96ff, alpha: BTN_ALPHA })
+    const downArrow = new Text({ text: '▼', style: new TextStyle({ fontSize: 28, fill: '#ffffff', fontFamily: 'sans-serif' }) })
+    downArrow.anchor.set(0.5)
+    downArrow.position.set(BTN_W / 2, BTN_H / 2)
+    this.touchDownBtn.addChild(downArrow)
+    this.touchDownBtn.position.set(BTN_X, LOGIC_H / 2 + 8)
+    this.touchDownBtn.eventMode = 'static'
+    this.touchDownBtn.cursor = 'pointer'
+    this.touchDownBtn.on('pointerdown', () => this.keysDown.add('ArrowDown'))
+    this.touchDownBtn.on('pointerup', () => this.keysDown.delete('ArrowDown'))
+    this.touchDownBtn.on('pointerupoutside', () => this.keysDown.delete('ArrowDown'))
+    this.stage.addChild(this.touchDownBtn)
   }
 
   private drawNet(): void {
