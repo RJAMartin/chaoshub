@@ -1,0 +1,57 @@
+<template>
+  <!-- GameCanvas: mounts PixiJS into a dedicated div. Vue never touches the canvas DOM node. -->
+  <div ref="containerRef" class="game-canvas-container" />
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+import { Application } from 'pixi.js'
+
+const containerRef = ref<HTMLDivElement | null>(null)
+let app: Application | null = null
+
+const emit = defineEmits<{
+  ready: [app: Application]
+  destroyed: []
+}>()
+
+onMounted(async () => {
+  if (!containerRef.value) return
+
+  app = new Application()
+  await app.init({
+    resizeTo: containerRef.value,
+    backgroundColor: 0x0a0a0f,
+    antialias: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
+  })
+
+  containerRef.value.appendChild(app.canvas)
+  emit('ready', app)
+})
+
+onUnmounted(() => {
+  if (app) {
+    app.destroy(true, { children: true })
+    app = null
+    emit('destroyed')
+  }
+})
+</script>
+
+<style scoped>
+.game-canvas-container {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+  background-color: #0a0a0f;
+}
+
+.game-canvas-container :deep(canvas) {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+</style>
