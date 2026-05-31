@@ -23,7 +23,7 @@ export const useGameStore = defineStore('game', () => {
   let activeInstance: GameInstance | null = null
 
   async function startGame(gameId: string, pixiApp: Application): Promise<void> {
-    if (sessionPhase.value !== 'idle') return
+    if (sessionPhase.value !== 'idle' && sessionPhase.value !== 'loading') return
 
     sessionPhase.value = 'loading'
     activeGameId.value = gameId
@@ -80,6 +80,12 @@ export const useGameStore = defineStore('game', () => {
     achievementEngine.evaluate()
   }
 
+  function setLoading(gameId: string): void {
+    sessionPhase.value = 'loading'
+    activeGameId.value = gameId
+    lastResults.value = []
+  }
+
   function resetToLobby(): void {
     sessionPhase.value = 'idle'
     activeGameId.value = null
@@ -92,6 +98,7 @@ export const useGameStore = defineStore('game', () => {
     sessionPhase,
     gameStartedAt,
     lastResults,
+    setLoading,
     startGame,
     endGame,
     resetToLobby,

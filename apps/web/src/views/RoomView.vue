@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRoomStore, usePlayerStore, useGameStore } from '@/stores/index'
 import { gameRegistry } from '@/core/registry/index'
@@ -217,14 +217,23 @@ async function handleStartGame(): Promise<void> {
   const gameId = roomStore.selectedGameId
   // Tell clients to start too
   networkAdapter.broadcast(PlatformEvents.GAME_STARTED, { gameId })
+  // Set phase to 'loading' first so the canvas becomes visible (removes --hidden),
+  // then wait a tick for the browser to resize the canvas before init() reads app.screen
+  gameStore.setLoading(gameId)
+  await nextTick()
+  // Small extra delay lets ResizeObserver / Pixi's resizeTo settle
+  await new Promise(r => setTimeout(r, 50))
   await gameStore.startGame(gameId, pixiApp.value)
 }
 
 async function restartGame(): Promise<void> {
   if (!roomStore.selectedGameId || !pixiApp.value) return
-  gameStore.resetToLobby()
   const gameId = roomStore.selectedGameId
+  gameStore.resetToLobby()
   networkAdapter.broadcast(PlatformEvents.GAME_STARTED, { gameId })
+  gameStore.setLoading(gameId)
+  await nextTick()
+  await new Promise(r => setTimeout(r, 50))
   await gameStore.startGame(gameId, pixiApp.value)
 }
 
@@ -271,14 +280,13 @@ function onCanvasDestroyed(): void {
   flex-direction: column;
   min-height: 0;
 }
-/* Hidden when in lobby — canvas stays mounted but takes no space */
+/* Hidden when in lobby — canvas stays at full size so app.screen is correct when init() runs */
 .game-session--hidden {
-  position: absolute !important;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
+  position: fixed !important;
+  top: 0; left: 0; right: 0; bottom: 0;
+  visibility: hidden;
   pointer-events: none;
+  z-index: -1;
 }
 .leave-game-btn {
   position: absolute;
