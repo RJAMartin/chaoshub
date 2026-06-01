@@ -24,7 +24,7 @@ const linkCopied = ref(false)
 
 const shareUrl = computed(() => {
   const base = window.location.origin + window.location.pathname
-  return `${base}#/room/${props.code}`
+  return `${base}?join=${props.code}`
 })
 
 async function copyCode(): Promise<void> {

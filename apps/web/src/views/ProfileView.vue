@@ -12,6 +12,7 @@
           <div class="identity-fields">
             <label class="field-label">Display Name</label>
             <input v-model="nameInput" class="input" maxlength="24" placeholder="Enter name…" @blur="saveName" @keydown.enter="saveName" />
+            <div v-if="nameError" class="name-error">{{ nameError }}</div>
 
             <label class="field-label" style="margin-top:1rem">Color</label>
             <div class="color-picker">
@@ -62,12 +63,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useProfileStore, useAchievementStore, useStatisticsStore } from '@/stores/index.js'
+import { validatePlayerName } from '@/core/utils/validation'
 
 const profileStore = useProfileStore()
 const achievementStore = useAchievementStore()
 const statsStore = useStatisticsStore()
 
 const nameInput = ref(profileStore.name)
+const nameError = ref('')
 
 const initials = computed(() =>
   profileStore.name.split(/(?=[A-Z])/).map(w => w[0]).join('').slice(0,2).toUpperCase()
@@ -92,7 +95,11 @@ function formatTime(ms: number): string {
 }
 
 function saveName(): void {
-  profileStore.saveName(nameInput.value)
+  nameError.value = ''
+  const result = validatePlayerName(nameInput.value)
+  if (!result.ok) { nameError.value = result.error; return }
+  nameInput.value = result.name
+  profileStore.saveName(result.name)
 }
 </script>
 
@@ -100,6 +107,7 @@ function saveName(): void {
 .profile-view { flex: 1; padding: 3rem 1.5rem; }
 .profile-inner { max-width: 900px; margin: 0 auto; }
 .page-title { font-size: 2rem; font-weight: 800; margin: 0 0 2rem; }
+.name-error { font-size: 0.75rem; color: #ff6b6b; margin-top: 0.25rem; }
 
 .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 .achievements-card { grid-column: 1 / -1; }

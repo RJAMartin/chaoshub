@@ -32,7 +32,8 @@
           </div>
         </div>
 
-        <div v-if="roomStore.error" class="error-msg">{{ roomStore.error }}</div>
+        <div v-if="joinError" class="error-msg">{{ joinError }}</div>
+        <div v-else-if="roomStore.error" class="error-msg">{{ roomStore.error }}</div>
       </div>
 
       <div class="hero-visual">
@@ -56,13 +57,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useRoomStore } from '@/stores/index.js'
+import { validateRoomCode } from '@/core/utils/validation'
 
 const router = useRouter()
+const route = useRoute()
 const roomStore = useRoomStore()
 const joinCode = ref('')
+const joinError = ref('')
+
+// Auto-join if ?join=CODE is present in the URL
+onMounted(async () => {
+  const code = route.query['join'] as string | undefined
+  if (code) {
+    joinCode.value = code
+    await roomStore.joinRoom(code.trim())
+    router.push(`/room/${code.trim()}`)
+  }
+})
 
 async function handleCreateRoom(): Promise<void> {
   const code = await roomStore.createRoom()
@@ -70,9 +84,11 @@ async function handleCreateRoom(): Promise<void> {
 }
 
 async function handleJoinRoom(): Promise<void> {
-  if (!joinCode.value.trim()) return
-  await roomStore.joinRoom(joinCode.value.trim())
-  router.push(`/room/${joinCode.value.trim()}`)
+  joinError.value = ''
+  const result = validateRoomCode(joinCode.value)
+  if (!result.ok) { joinError.value = result.error; return }
+  await roomStore.joinRoom(result.code)
+  router.push(`/room/${result.code}`)
 }
 
 const featuredGames = [

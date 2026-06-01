@@ -6,6 +6,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { Application } from 'pixi.js'
+import { eventBus } from '@/core/events/event-bus'
 
 const containerRef = ref<HTMLDivElement | null>(null)
 let app: Application | null = null
@@ -14,6 +15,16 @@ const emit = defineEmits<{
   ready: [app: Application]
   destroyed: []
 }>()
+
+const handleResize = () => {
+  if (!app) return
+  // Pixi's resizeTo/ResizeObserver handles the renderer resize automatically.
+  // We emit an event so active games can re-layout their stage.
+  eventBus.emit('platform:canvas:resized', {
+    width: app.screen.width,
+    height: app.screen.height,
+  })
+}
 
 onMounted(async () => {
   if (!containerRef.value) return
@@ -28,10 +39,12 @@ onMounted(async () => {
   })
 
   containerRef.value.appendChild(app.canvas)
+  window.addEventListener('resize', handleResize)
   emit('ready', app)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
   if (app) {
     app.destroy(true, { children: true, texture: true })
     app = null

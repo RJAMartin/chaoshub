@@ -34,6 +34,7 @@ export const BP_EVENTS = {
   SCORE: 'ball-push:score',
   RESET: 'ball-push:reset',
   GAME_OVER: 'ball-push:game-over',
+  COUNTDOWN: 'ball-push:countdown',
 } as const
 
 interface BPState {
@@ -71,6 +72,7 @@ export class BallPushGame implements GameInstance {
   private gNet!: Graphics
   private scoreText!: Text
   private statusText!: Text
+  private countdownText!: Text
   private touchUpBtn!: Graphics
   private touchDownBtn!: Graphics
 
@@ -86,8 +88,10 @@ export class BallPushGame implements GameInstance {
   private score: BPScore = { p1: 0, p2: 0 }
   private frameCount = 0
   private gameOver = false
-  private isPlayerOne = false // host = p1, first joiner = p2
+  private ballFrozen = true   // true during countdown — physics runs but ball is held still
+  private isPlayerOne = false
   private remoteState: BPState = { ball: { x: LOGIC_W / 2, y: LOGIC_H / 2 }, p1: { y: LOGIC_H / 2 }, p2: { y: LOGIC_H / 2 } }
+  private countdownTimer: ReturnType<typeof setInterval> | null = null
 
   // Input tracking
   private keysDown = new Set<string>()
@@ -118,6 +122,13 @@ export class BallPushGame implements GameInstance {
     }
   }
 
+  private readonly onCountdown = (msg: { payload: unknown }) => {
+    if (this.ctx.network.isHost()) return
+    const { value } = msg.payload as { value: number | 'GO' }
+    this.showCountdownValue(value)
+    if (value === 'GO') this.ballFrozen = false
+  }
+
   private readonly onGameOver = (msg: { payload: unknown }) => {
     const { winner } = msg.payload as { winner: 'p1' | 'p2' }
     this.showGameOver(winner)
@@ -134,9 +145,7 @@ export class BallPushGame implements GameInstance {
     this.registerInputListeners()
 
     const players = this.ctx.players.getPlayers()
-    // Host is always p1
     this.isPlayerOne = this.ctx.network.isHost()
-    // If only 1 player, still run as p1
     if (players.length < 2 && !this.ctx.network.isHost()) {
       this.isPlayerOne = false
     }
@@ -144,6 +153,13 @@ export class BallPushGame implements GameInstance {
     if (this.ctx.network.isHost()) {
       this.initPhysics()
     }
+
+    // Re-scale stage on window resize
+    this.ctx.events.on('platform:canvas:resized', this.onCanvasResized as never)
+  }
+
+  private readonly onCanvasResized = () => {
+    this.scaleStage()
   }
 
   // ── Scene ──────────────────────────────────────────────────────────────────
@@ -205,6 +221,22 @@ export class BallPushGame implements GameInstance {
     this.statusText.anchor.set(0.5)
     this.statusText.position.set(LOGIC_W / 2, LOGIC_H / 2 - 60)
     this.stage.addChild(this.statusText)
+
+    // Countdown text (centre screen, large)
+    this.countdownText = new Text({
+      text: '',
+      style: new TextStyle({
+        fontFamily: '"Space Grotesk", sans-serif',
+        fontSize: 96,
+        fontWeight: '900',
+        fill: '#ffffff',
+        align: 'center',
+        dropShadow: { blur: 20, distance: 0, color: '#00f5ff', alpha: 0.9 },
+      }),
+    })
+    this.countdownText.anchor.set(0.5)
+    this.countdownText.position.set(LOGIC_W / 2, LOGIC_H / 2)
+    this.stage.addChild(this.countdownText)
 
     // Touch controls (visible on touch devices, semi-transparent on desktop)
     this.buildTouchControls()
@@ -302,20 +334,61 @@ export class BallPushGame implements GameInstance {
 
     World.add(w.world, [this.topWall, this.bottomWall, this.paddle1, this.paddle2, this.ball])
 
-    // Kick off ball
-    this.resetBall()
+    // Start with countdown before launching
+    this.startCountdown()
   }
 
-  private resetBall(): void {
+  private startCountdown(): void {
     if (!this.ball) return
+    // Park ball at centre, frozen
     Body.setPosition(this.ball, { x: LOGIC_W / 2, y: LOGIC_H / 2 })
+    Body.setVelocity(this.ball, { x: 0, y: 0 })
+    this.ballFrozen = true
+    this.ctx.network.broadcast(BP_EVENTS.RESET, {})
+
+    let count = 3
+    this.showCountdownValue(count)
+    this.ctx.network.broadcast(BP_EVENTS.COUNTDOWN, { value: count })
+
+    this.countdownTimer = setInterval(() => {
+      count--
+      if (count > 0) {
+        this.showCountdownValue(count)
+        this.ctx.network.broadcast(BP_EVENTS.COUNTDOWN, { value: count })
+      } else {
+        clearInterval(this.countdownTimer!)
+        this.countdownTimer = null
+        this.showCountdownValue('GO')
+        this.ctx.network.broadcast(BP_EVENTS.COUNTDOWN, { value: 'GO' })
+        // Launch ball and unfreeze after a brief flash
+        setTimeout(() => {
+          this.launchBall()
+          this.ballFrozen = false
+          this.countdownText.text = ''
+        }, 600)
+      }
+    }, 1000)
+  }
+
+  private launchBall(): void {
+    if (!this.ball) return
     const angle = (Math.random() * Math.PI) / 3 - Math.PI / 6
     const dir = Math.random() > 0.5 ? 1 : -1
     Body.setVelocity(this.ball, {
       x: dir * 6 * Math.cos(angle),
       y: 6 * Math.sin(angle),
     })
-    this.ctx.network.broadcast(BP_EVENTS.RESET, {})
+  }
+
+  private showCountdownValue(value: number | 'GO'): void {
+    this.countdownText.text = value === 'GO' ? 'GO!' : String(value)
+    ;(this.countdownText.style as TextStyle).fill = value === 'GO' ? '#30d158' : '#ffffff'
+    ;(this.countdownText.style as TextStyle).fontSize = value === 'GO' ? 80 : 96
+  }
+
+  private resetBall(): void {
+    // After a goal: short pause then countdown again
+    setTimeout(() => this.startCountdown(), 1200)
   }
 
   // ── Input ─────────────────────────────────────────────────────────────────
@@ -340,6 +413,7 @@ export class BallPushGame implements GameInstance {
     this.ctx.network.on(BP_EVENTS.STATE, this.onState as never)
     this.ctx.network.on(BP_EVENTS.SCORE, this.onScore as never)
     this.ctx.network.on(BP_EVENTS.RESET, this.onReset as never)
+    this.ctx.network.on(BP_EVENTS.COUNTDOWN, this.onCountdown as never)
     this.ctx.network.on(BP_EVENTS.GAME_OVER, this.onGameOver as never)
   }
 
@@ -400,6 +474,11 @@ export class BallPushGame implements GameInstance {
   private stepPhysics(): void {
     if (!this.engine) return
     Engine.update(this.engine, 1000 / 60)
+    // Keep ball pinned to centre during countdown
+    if (this.ballFrozen && this.ball) {
+      Body.setPosition(this.ball, { x: LOGIC_W / 2, y: LOGIC_H / 2 })
+      Body.setVelocity(this.ball, { x: 0, y: 0 })
+    }
   }
 
   private checkGoals(): void {
@@ -495,10 +574,13 @@ export class BallPushGame implements GameInstance {
     window.removeEventListener('keydown', this.handleKeyDown)
     window.removeEventListener('keyup', this.handleKeyUp)
 
+    if (this.countdownTimer) clearInterval(this.countdownTimer)
+
     this.ctx.network.off(BP_EVENTS.INPUT, this.onInput as never)
     this.ctx.network.off(BP_EVENTS.STATE, this.onState as never)
     this.ctx.network.off(BP_EVENTS.SCORE, this.onScore as never)
     this.ctx.network.off(BP_EVENTS.RESET, this.onReset as never)
+    this.ctx.network.off(BP_EVENTS.COUNTDOWN, this.onCountdown as never)
     this.ctx.network.off(BP_EVENTS.GAME_OVER, this.onGameOver as never)
 
     if (this.engine) {
@@ -507,6 +589,7 @@ export class BallPushGame implements GameInstance {
     }
 
     // Clear stage — do NOT destroy the Pixi app
+    this.ctx.events.off('platform:canvas:resized', this.onCanvasResized as never)
     this.app.stage.removeChildren()
   }
 }

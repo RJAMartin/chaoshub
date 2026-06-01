@@ -147,6 +147,8 @@ export class PixelWarGame implements GameInstance {
     this.registerNetworkListeners()
     this.registerInputListeners()
 
+    this.ctx.events.on('platform:canvas:resized', this.onCanvasResized as never)
+
     if (this.ctx.network.isHost()) {
       // Give clients time to init, then send full sync + start timer
       setTimeout(() => {
@@ -154,6 +156,10 @@ export class PixelWarGame implements GameInstance {
         this.startTimer()
       }, 600)
     }
+  }
+
+  private readonly onCanvasResized = () => {
+    this.scaleStage()
   }
 
   // ── Color map ─────────────────────────────────────────────────────────────
@@ -541,6 +547,7 @@ export class PixelWarGame implements GameInstance {
     this.ctx.network.off(PW_EVENTS.GAME_OVER, this.onGameOver as never)
 
     // Clear stage — do NOT destroy the Pixi app
+    this.ctx.events.off('platform:canvas:resized', this.onCanvasResized as never)
     this.app.stage.removeChildren()
   }
 }
