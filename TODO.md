@@ -51,20 +51,20 @@
 - `[DONE]` Components: AppShell, AppNav, GameCanvas, PlayerCard, GameCard, RoomCode, AchievementToast
 - `[DONE]` Lobby: create room, join room, player list, ready toggle, host controls, game picker
 - `[DONE]` Design tokens: retro arcade / neon Tailwind v4 theme
-- `[ ]` `<CountdownOverlay>` component (3, 2, 1, GO!)
-- `[ ]` `<ScoreBoard>` component (post-game results table)
-- `[ ]` Invite link: `?join=CODE` query param auto-triggers join
-- `[ ]` Host: kick player from lobby
-- `[ ]` Mobile nav menu (hamburger) for small screens
-- `[ ]` Loading skeleton states for game library
+- `[DONE]` `<CountdownOverlay>` component (3, 2, 1, GO!)
+- `[DONE]` `<ScoreBoard>` component (post-game results table)
+- `[DONE]` Invite link: `?join=CODE` query param auto-triggers join
+- `[DONE]` Host: kick player from lobby
+- `[DONE]` Mobile nav menu (hamburger) for small screens
+- `[DONE]` Loading skeleton states for game library
 
 ---
 
 ## Phase 3 — PixiJS Integration
 
 - `[DONE]` `<GameCanvas>` mounts/destroys PixiJS Application
-- `[BUG]` Pixi double-init: GameCanvas + game both create app — need to pass app via context or emit
-- `[ ]` Resize handler: canvas fills container on window resize
+- `[DONE]` Resize handler: canvas fills container on window resize
+- `[DONE]` Pixi double-init fixed: app passed via GameContext, not created in game
 - `[ ]` Asset loader utility (wraps Pixi `Assets`)
 - `[ ]` Sprite sheet helpers in `packages/engine`
 - `[ ]` Particle system helper (basic, without library)
@@ -73,59 +73,29 @@
 
 ## Phase 4 — Games
 
-### Reaction Test ✓
-- `[DONE]` module.ts + GameModule registration
-- `[DONE]` Host/client state machine (waiting → countdown → ready → signal → results)
-- `[DONE]` Multi-round (3 rounds)
-- `[DONE]` False-start detection
-- `[DONE]` Stats recording
-- `[DONE]` Pixi rendering
-- `[ ]` Polish: animated countdown in Pixi
-- `[ ]` Show per-player reaction times overlay
-- `[ ]` Sound effect on signal (Web Audio API)
+### Shipped (36 games)
+- `[DONE]` Reaction Test, Ball Push, Pixel War, Music Toy, Type Racer, Color Flood, Simon Says
+- `[DONE]` Asteroid Duel, Word Scramble, Snake Battle, Trivia Quiz, Pong Duel, Dodge Blitz
+- `[DONE]` Coin Grab, Memory Match, Number Crunch, Drawing Guesser, Wordle Race, Sumo Shove
+- `[DONE]` Maze Race, Bomberman, Whack-a-Mole, Button Mash, Battleship, Connect Four
+- `[DONE]` Emoji Decode, Hot or Cold, Minesweeper Race, Spelling Bee, Hangman
+- `[DONE]` Air Hockey, Breakout Blitz, Pixel Portrait, Platform Runner, Rhythm Tap, Story Chain
 
-### Ball Push
-- `[ ]` module.ts
-- `[ ]` Matter.js physics world setup
-- `[ ]` Ball and player paddle physics bodies
-- `[ ]` Pixi rendering synced to Matter.js
-- `[ ]` Host: advance physics simulation
-- `[ ]` Host: broadcast body positions each frame
-- `[ ]` Client: render received positions
-- `[ ]` Goal detection + score tracking
-- `[ ]` Reset on goal
-- `[ ]` Win condition (first to 3)
-
-### Pixel War
-- `[ ]` module.ts
-- `[ ]` Shared NxN pixel grid (host-authoritative)
-- `[ ]` Player assigns color on join
-- `[ ]` Click/tap claims pixel
-- `[ ]` Host broadcasts full diff each tick (or per-click)
-- `[ ]` Pixi renders grid
-- `[ ]` Score = pixel count per player
-- `[ ]` Timer-based round end
-- `[ ]` Winner = most pixels
-
-### Collaborative Music Toy
-- `[ ]` module.ts
-- `[ ]` Web Audio API oscillator/sampler setup
-- `[ ]` Players place notes on a shared grid
-- `[ ]` Host broadcasts note placements
-- `[ ]` Looping playback engine
-- `[ ]` Visual waveform in Pixi
-- `[ ]` No win condition (sandbox mode)
+### Polish
+- `[ ]` Reaction Test: animated countdown in Pixi
+- `[ ]` Reaction Test: per-player reaction times overlay
+- `[ ]` Reaction Test: sound effect on signal (Web Audio API)
 
 ---
 
 ## Phase 5 — DX Tooling
 
 - `[DONE]` `pnpm create-game` CLI scaffold
-- `[ ]` VSCode workspace settings (`.vscode/settings.json`)
-- `[ ]` `.vscode/extensions.json` (Volar, ESLint, Tailwind CSS IntelliSense)
-- `[ ]` `.editorconfig`
-- `[ ]` ESLint config (flat config, Vue + TypeScript rules)
-- `[ ]` Prettier config
+- `[DONE]` VSCode workspace settings (`.vscode/settings.json`)
+- `[DONE]` `.vscode/extensions.json` (Volar, ESLint, Tailwind CSS IntelliSense)
+- `[DONE]` `.editorconfig`
+- `[DONE]` ESLint config (flat config, Vue + TypeScript rules)
+- `[DONE]` Prettier config
 
 ---
 
@@ -137,11 +107,11 @@
 - `[ ]` Unit tests: AchievementEngine (conditions, no double-unlock)
 - `[ ]` Unit tests: StatisticsService
 - `[ ]` Integration test: create room → join → start game → end
-- `[ ]` Network: disconnect mid-game UI (host gone → redirect home)
+- `[DONE]` Network: disconnect mid-game UI (host gone → redirect home)
 - `[ ]` Network: reconnection with exponential backoff
-- `[ ]` Input validation: room codes, player names (XSS safe)
-- `[ ]` Error boundary component (Vue `onErrorCaptured`)
-- `[ ]` Graceful degradation: PeerJS Cloud unreachable message
+- `[DONE]` Input validation: room codes, player names (XSS safe)
+- `[DONE]` Error boundary component (Vue `onErrorCaptured`)
+- `[DONE]` Graceful degradation: PeerJS Cloud unreachable message
 - `[ ]` Accessibility: keyboard navigation in lobby
 - `[ ]` Accessibility: ARIA labels on interactive elements
 - `[ ]` Responsive: test all views at 320px, 768px, 1440px
@@ -169,6 +139,6 @@
 
 ## Ongoing
 
+- `[DONE]` Add Google Fonts link for `Space Grotesk` + `JetBrains Mono` in `index.html`
+- `[DONE]` Favicon SVG (`/public/favicon.svg`)
 - `[ ]` Update `.opencode/chaoshub-progress.md` at end of every session
-- `[ ]` Add Google Fonts link for `Space Grotesk` in `index.html`
-- `[ ]` Favicon SVG (`/public/favicon.svg`)

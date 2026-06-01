@@ -7,7 +7,7 @@
         <span class="logo-text glow-cyan">ChaosHub</span>
       </RouterLink>
 
-      <!-- Links -->
+      <!-- Desktop links -->
       <div class="nav-links">
         <RouterLink to="/games" class="nav-link">Games</RouterLink>
         <RouterLink to="/profile" class="nav-link">Profile</RouterLink>
@@ -20,14 +20,29 @@
         <span class="font-mono text-xs neon-green">{{ roomStore.roomCode }}</span>
         <button class="btn btn-ghost btn-sm" @click="roomStore.leaveRoom()">Leave</button>
       </div>
+
+      <!-- Hamburger (mobile) -->
+      <button class="hamburger" :class="{ open: menuOpen }" @click="menuOpen = !menuOpen" aria-label="Toggle menu">
+        <span /><span /><span />
+      </button>
+    </div>
+
+    <!-- Mobile dropdown -->
+    <div v-if="menuOpen" class="mobile-menu" @click="menuOpen = false">
+      <RouterLink to="/games" class="nav-link">Games</RouterLink>
+      <RouterLink to="/profile" class="nav-link">Profile</RouterLink>
+      <RouterLink to="/settings" class="nav-link">Settings</RouterLink>
+      <button v-if="roomStore.isInRoom" class="btn btn-ghost btn-sm" @click="roomStore.leaveRoom()">Leave Room ({{ roomStore.roomCode }})</button>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRoomStore } from '@/stores/index.js'
 
 const roomStore = useRoomStore()
+const menuOpen = ref(false)
 </script>
 
 <style scoped>
@@ -112,5 +127,43 @@ const roomStore = useRoomStore()
 
 @media (max-width: 640px) {
   .nav-links { display: none; }
+  .nav-room-badge { display: none; }
+  .hamburger { display: flex; }
+}
+
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  margin-left: auto;
+}
+.hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--color-text-secondary);
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+.mobile-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 1rem 1rem;
+  gap: 0.25rem;
+  background: rgba(10, 10, 15, 0.97);
+  border-top: 1px solid var(--color-border);
+}
+.mobile-menu .nav-link {
+  padding: 0.6rem 0.75rem;
+  font-size: 1rem;
 }
 </style>

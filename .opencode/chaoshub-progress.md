@@ -2,7 +2,76 @@
 
 ## Status: Live at https://rjamartin.github.io/chaoshub/
 
-Last updated: Session 2
+Last updated: Session 4
+
+---
+
+## Completed
+
+### Session 1 — Foundation (Phases 0–5)
+- [x] pnpm monorepo, Vite + Vue 3 + TypeScript + Tailwind v4
+- [x] Full core systems: EventBus, GameRegistry, GameLoop, NetworkAPI (PeerJS), StorageAPI, PlayerManager, StatisticsService, AchievementEngine, GameContext factory
+- [x] Pinia stores: room, players, game, profile, achievements, statistics
+- [x] Vue Router (hash history, 5 routes)
+- [x] All views + components (lobby, game session, profile, etc.)
+- [x] Reaction Test game (first playable)
+- [x] pnpm create-game CLI scaffold
+- [x] .opencode/ skill files
+
+### Session 2 — Fix, Polish, Deploy
+- [x] Fixed Pixi double-init: GameCanvas owns Application, passes via context.pixiApp
+- [x] ScoreBoard component (post-game results with medals)
+- [x] CountdownOverlay component
+- [x] Invite link: ?join=CODE auto-triggers join
+- [x] Input validation (room codes, player names, XSS safe)
+- [x] Google Fonts (Space Grotesk + JetBrains Mono)
+- [x] Favicon SVG (neon lightning bolt)
+- [x] Ball Push game (Matter.js physics, host-authority, keyboard input)
+- [x] Pixel War game
+- [x] Music Toy game
+- [x] ESLint flat config, Prettier, .editorconfig, VSCode settings
+- [x] Disconnect mid-game overlay (host gone → countdown → redirect home)
+- [x] GitHub repo created: https://github.com/RJAMartin/chaoshub
+- [x] GitHub Pages live: https://rjamartin.github.io/chaoshub/
+
+### Session 3 — 36 Games
+- [x] 21 games shipped (commit e17ee03): Type Racer, Color Flood, Simon Says, Asteroid Duel, Word Scramble, Snake Battle, Trivia Quiz, Pong Duel, Dodge Blitz, Coin Grab, Memory Match, Number Crunch, Drawing Guesser, Wordle Race, Sumo Shove, Maze Race, Bomberman, Connect Four, Battleship, Emoji Decode, Minesweeper Race, Hot or Cold, Spelling bee
+- [x] 13 more games (commit 632d1f1): Whack-a-Mole, Button Mash, Hangman, Air Hockey, Breakout Blitz, Pixel Portrait, Platform Runner, Rhythm Tap, Story Chain
+- [x] All TS strict-mode errors fixed, build passes cleanly
+
+### Session 4 — Platform Polish
+- [x] Mobile nav hamburger menu (screens <640px)
+- [x] Host kick player button in lobby (with PeerJS close + playerManager.removePlayer)
+- [x] Loading skeleton shimmer animation for game library
+- [x] ErrorBoundary.vue component (wraps router-view in App.vue, onErrorCaptured)
+- [x] PeerJS unreachable banner: ROOM_ERROR event → dismissible banner in HomeView
+- [x] TODO.md fully updated to reflect reality (36 games shipped, all Phase 2/5 done)
+- [x] peer-adapter.ts: emit ROOM_ERROR on all error paths (init, connect, data)
+
+---
+
+## Pending / Next Session
+
+### High Priority
+- [ ] Unit tests: EventBus, GameRegistry, GameLoop, AchievementEngine, StatisticsService
+- [ ] Integration test: create room → join → start game → end
+
+### Medium Priority
+- [ ] Accessibility: keyboard navigation in lobby, ARIA labels
+- [ ] Performance: lazy-load Pixi only when entering a game
+- [ ] Network: reconnection with exponential backoff
+
+### Low Priority / Future
+- [ ] Spectator mode, host migration, PWA, Supabase, tournaments...
+- [ ] Asset loader utility, sprite sheet helpers, particle system helper
+- [ ] Reaction Test polish: animated countdown, per-player times overlay, sound effect
+
+---
+
+## Known Issues
+- Ball Push: no touch/mobile input (keyboard only)
+- Node.js 20 deprecation warnings in CI (harmless until Sept 2026)
+
 
 ---
 

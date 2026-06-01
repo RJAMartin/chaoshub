@@ -51,12 +51,18 @@
 
           <div class="section-label">Players ({{ playerStore.players.length }})</div>
           <TransitionGroup name="slide-up" tag="div" class="players-list">
-            <PlayerCard
-              v-for="player in playerStore.players"
-              :key="player.id"
-              :player="player"
-              :isLocal="player.id === playerStore.localPlayer.id"
-            />
+            <div v-for="player in playerStore.players" :key="player.id" class="player-row">
+              <PlayerCard
+                :player="player"
+                :isLocal="player.id === playerStore.localPlayer.id"
+              />
+              <button
+                v-if="roomStore.isHost && player.id !== playerStore.localPlayer.id"
+                class="btn btn-ghost btn-sm kick-btn"
+                title="Kick player"
+                @click="roomStore.kickPlayer(player.id)"
+              >✕</button>
+            </div>
           </TransitionGroup>
 
           <button
@@ -301,6 +307,10 @@ function onCanvasDestroyed(): void {
 }
 
 .players-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.player-row { display: flex; align-items: center; gap: 0.5rem; }
+.player-row > :first-child { flex: 1; }
+.kick-btn { color: var(--color-neon-pink); border-color: transparent; opacity: 0.5; }
+.kick-btn:hover { opacity: 1; border-color: var(--color-neon-pink); }
 .ready-btn { width: 100%; }
 
 .game-picker-grid {

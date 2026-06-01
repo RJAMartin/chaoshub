@@ -3,10 +3,15 @@
     <div class="library-inner">
       <div class="library-header">
         <h1 class="library-title">Game Library</h1>
-        <p class="library-subtitle">{{ games.length }} game{{ games.length !== 1 ? 's' : '' }} available</p>
+        <p class="library-subtitle">{{ loading ? 'Loading…' : `${games.length} game${games.length !== 1 ? 's' : ''} available` }}</p>
       </div>
 
-      <div v-if="games.length === 0" class="empty-state">
+      <!-- Skeleton loading state -->
+      <div v-if="loading" class="games-grid">
+        <div v-for="n in 12" :key="n" class="skeleton-card" />
+      </div>
+
+      <div v-else-if="games.length === 0" class="empty-state">
         <div class="empty-icon">🎮</div>
         <div class="empty-text">No games registered yet.</div>
       </div>
@@ -24,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { gameRegistry } from '@/core/registry/index.js'
 import { useRoomStore } from '@/stores/index.js'
@@ -33,6 +38,12 @@ import GameCard from '@/components/GameCard.vue'
 const router = useRouter()
 const roomStore = useRoomStore()
 const games = computed(() => gameRegistry.list())
+const loading = ref(true)
+
+onMounted(() => {
+  // Allow one tick for dynamic imports / registry to hydrate
+  requestAnimationFrame(() => { loading.value = false })
+})
 
 function handleSelect(gameId: string): void {
   if (roomStore.isInRoom && roomStore.isHost) {
@@ -52,4 +63,18 @@ function handleSelect(gameId: string): void {
 .empty-state { text-align: center; padding: 4rem; color: var(--color-text-muted); }
 .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
 .empty-text { font-size: 1rem; }
+
+.skeleton-card {
+  height: 160px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--color-bg-elevated) 25%, var(--color-bg-surface) 50%, var(--color-bg-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 </style>
+

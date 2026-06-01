@@ -83,6 +83,12 @@ export const useRoomStore = defineStore('room', () => {
     leaveRoom()
   })
 
+  function kickPlayer(peerId: string): void {
+    if (!isHost.value) return
+    networkAdapter.kickPlayer(peerId)
+    playerManager.removePlayer(peerId)
+  }
+
   return {
     roomCode,
     phase,
@@ -96,5 +102,6 @@ export const useRoomStore = defineStore('room', () => {
     leaveRoom,
     selectGame,
     setPhase,
+    kickPlayer,
   }
 })

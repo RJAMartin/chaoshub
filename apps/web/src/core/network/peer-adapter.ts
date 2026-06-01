@@ -42,7 +42,11 @@ class PeerJSAdapter implements NetworkAPI {
         resolve(id)
       })
 
-      this.peer.on('error', reject)
+      this.peer.on('error', (err) => {
+        const msg = (err as Error).message ?? String(err)
+        eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
+        reject(err)
+      })
     })
   }
 
@@ -73,10 +77,18 @@ class PeerJSAdapter implements NetworkAPI {
           eventBus.emit(PlatformEvents.ROOM_CLOSED, { message: 'Host disconnected' })
         })
 
-        conn.on('error', reject)
+        conn.on('error', (err) => {
+          const msg = (err as Error).message ?? String(err)
+          eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
+          reject(err)
+        })
       })
 
-      this.peer.on('error', reject)
+      this.peer.on('error', (err) => {
+        const msg = (err as Error).message ?? String(err)
+        eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
+        reject(err)
+      })
     })
   }
 
@@ -166,6 +178,16 @@ class PeerJSAdapter implements NetworkAPI {
 
   getConnectedPeerIds(): string[] {
     return [...this.connections.keys()]
+  }
+
+  kickPlayer(peerId: string): void {
+    if (!this._isHost) return
+    const conn = this.connections.get(peerId)
+    if (conn) {
+      // Notify the kicked peer before closing
+      conn.send({ event: PlatformEvents.ROOM_CLOSED, payload: { message: 'You were kicked by the host' }, senderId: this._peerId })
+      setTimeout(() => { conn.close() }, 200)
+    }
   }
 
   // ── Cleanup ───────────────────────────────────────────────────────────────

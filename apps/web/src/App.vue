@@ -1,10 +1,12 @@
 <template>
   <AppShell>
-    <router-view v-slot="{ Component }">
-      <Transition name="fade" mode="out-in">
-        <component :is="Component" />
-      </Transition>
-    </router-view>
+    <ErrorBoundary>
+      <router-view v-slot="{ Component }">
+        <Transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </Transition>
+      </router-view>
+    </ErrorBoundary>
   </AppShell>
 
   <!-- Global achievement toast -->
@@ -14,4 +16,5 @@
 <script setup lang="ts">
 import AppShell from '@/components/AppShell.vue'
 import AchievementToast from '@/components/AchievementToast.vue'
+import ErrorBoundary from '@/components/ErrorBoundary.vue'
 </script>

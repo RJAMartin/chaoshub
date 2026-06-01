@@ -1,6 +1,12 @@
 <template>
   <div class="home-view">
-    <!-- Hero -->
+    <!-- Network error banner -->
+    <Transition name="fade">
+      <div v-if="networkError" class="network-error-banner">
+        <span>⚠️ {{ networkError }}</span>
+        <button class="eb-close" @click="networkError = ''">✕</button>
+      </div>
+    </Transition>
     <section class="hero">
       <div class="hero-content">
         <div class="hero-eyebrow">⚡ BROWSER MULTIPLAYER PLATFORM</div>
@@ -57,16 +63,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useRoomStore } from '@/stores/index.js'
 import { validateRoomCode } from '@/core/utils/validation'
+import { eventBus } from '@/core/events/event-bus.js'
+import { PlatformEvents } from '@/core/events/platform-events.js'
 
 const router = useRouter()
 const route = useRoute()
 const roomStore = useRoomStore()
 const joinCode = ref('')
 const joinError = ref('')
+const networkError = ref('')
+
+const onNetworkError = (payload: unknown) => {
+  const msg = (payload as { message?: string })?.message ?? 'PeerJS signalling server unreachable.'
+  networkError.value = `Network error: ${msg}. Check your connection.`
+}
+eventBus.on(PlatformEvents.ROOM_ERROR, onNetworkError)
+onUnmounted(() => { eventBus.off(PlatformEvents.ROOM_ERROR, onNetworkError) })
 
 // Auto-join if ?join=CODE is present in the URL
 onMounted(async () => {
@@ -216,4 +232,26 @@ const features = [
   .hero { grid-template-columns: 1fr; gap: 2rem; padding: 3rem 1.25rem; min-height: auto; }
   .hero-visual { display: none; }
 }
+
+.network-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(255, 45, 120, 0.12);
+  border-bottom: 1px solid var(--color-neon-pink);
+  color: var(--color-neon-pink);
+  font-size: 0.875rem;
+}
+.eb-close {
+  background: none;
+  border: none;
+  color: var(--color-neon-pink);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 0.25rem;
+  opacity: 0.7;
+}
+.eb-close:hover { opacity: 1; }
 </style>
