@@ -82,9 +82,9 @@
 - `[DONE]` Air Hockey, Breakout Blitz, Pixel Portrait, Platform Runner, Rhythm Tap, Story Chain
 
 ### Polish
-- `[ ]` Reaction Test: animated countdown in Pixi
-- `[ ]` Reaction Test: per-player reaction times overlay
-- `[ ]` Reaction Test: sound effect on signal (Web Audio API)
+- `[DONE]` Reaction Test: animated countdown in Pixi (pulse animation + scale tween)
+- `[DONE]` Reaction Test: per-player reaction times overlay
+- `[DONE]` Reaction Test: sound effect on signal (Web Audio API via SoundManager)
 
 ---
 
@@ -108,13 +108,13 @@
 - `[ ]` Unit tests: StatisticsService
 - `[ ]` Integration test: create room → join → start game → end
 - `[DONE]` Network: disconnect mid-game UI (host gone → redirect home)
-- `[ ]` Network: reconnection with exponential backoff
+- `[DONE]` Network: reconnection with exponential backoff (4 attempts, 1s/2s/4s/8s)
 - `[DONE]` Input validation: room codes, player names (XSS safe)
 - `[DONE]` Error boundary component (Vue `onErrorCaptured`)
 - `[DONE]` Graceful degradation: PeerJS Cloud unreachable message
-- `[ ]` Accessibility: keyboard navigation in lobby
-- `[ ]` Accessibility: ARIA labels on interactive elements
-- `[ ]` Responsive: test all views at 320px, 768px, 1440px
+- `[DONE]` Accessibility: keyboard navigation in lobby
+- `[DONE]` Accessibility: ARIA labels on interactive elements
+- `[DONE]` Responsive: test all views at 320px, 768px, 1440px — fixed grid min-widths and padding
 - `[ ]` Performance: lazy-load Pixi only when entering a game
 
 ---
@@ -124,7 +124,7 @@
 - `[FUTURE]` Spectator mode: `PlayerRole = 'player' | 'spectator'` (type exists, logic pending)
 - `[FUTURE]` Host migration: promote new host on disconnect
 - `[FUTURE]` AI players: bot PlayerManager injection via GameContext
-- `[FUTURE]` PWA: `vite-plugin-pwa` — zero arch changes needed
+- `[DONE]` PWA: `vite-plugin-pwa` — service worker + manifest + icons added
 - `[FUTURE]` Supabase adapter: `SupabaseStorageAdapter implements StorageAPI`
 - `[FUTURE]` Cross-device profiles via Supabase Auth
 - `[FUTURE]` Global leaderboards via Supabase DB

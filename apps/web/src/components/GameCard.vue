@@ -1,5 +1,14 @@
 <template>
-  <div class="game-card" :class="{ selected }" @click="$emit('select', game.id)">
+  <div
+    class="game-card"
+    :class="{ selected }"
+    role="button"
+    tabindex="0"
+    :aria-pressed="selected"
+    :aria-label="`${game.name} — ${game.description}. ${game.minPlayers}–${game.maxPlayers} players.`"
+    @click="$emit('select', game.id)"
+    @keydown.enter.space.prevent="$emit('select', game.id)"
+  >
     <div class="game-thumbnail">
       <span class="game-thumb-emoji">{{ thumbEmoji }}</span>
     </div>
@@ -49,6 +58,10 @@ const thumbEmoji = computed(() => {
   display: flex;
   flex-direction: column;
   position: relative;
+}
+.game-card:focus-visible {
+  outline: 2px solid var(--color-neon-cyan);
+  outline-offset: 2px;
 }
 .game-card:hover {
   border-color: var(--color-neon-cyan);

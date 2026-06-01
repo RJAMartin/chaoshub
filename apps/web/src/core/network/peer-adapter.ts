@@ -15,6 +15,9 @@ import { playerManager } from '@/core/services/players/player-manager'
 
 type NetworkCallback = (msg: NetworkMessage) => void
 
+const MAX_RECONNECT_ATTEMPTS = 4
+const RECONNECT_BASE_MS = 1000
+
 class PeerJSAdapter implements NetworkAPI {
   private peer: Peer | null = null
   private connections = new Map<string, DataConnection>()
@@ -22,6 +25,12 @@ class PeerJSAdapter implements NetworkAPI {
   private _peerId: string = ''
   private _isHost: boolean = false
   private listeners = new Map<string, Set<NetworkCallback>>()
+
+  // Reconnection state (client only)
+  private _hostId: string = ''
+  private _reconnectAttempt = 0
+  private _reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private _intentionalDisconnect = false
 
   // ── Setup ────────────────────────────────────────────────────────────────
 
@@ -51,18 +60,28 @@ class PeerJSAdapter implements NetworkAPI {
   }
 
   async initAsClient(hostId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.peer = new Peer()
+    this._hostId = hostId
+    this._reconnectAttempt = 0
+    this._intentionalDisconnect = false
+    return this._connectToHost()
+  }
 
-      this.peer.on('open', (id) => {
+  private _connectToHost(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Reuse existing Peer object if still alive, otherwise create fresh
+      if (!this.peer || this.peer.destroyed) {
+        this.peer = new Peer()
+      }
+
+      const doConnect = (id: string) => {
         this._peerId = id
         this._isHost = false
 
-        const conn = this.peer!.connect(hostId, { reliable: true })
+        const conn = this.peer!.connect(this._hostId, { reliable: true })
         this.hostConnection = conn
 
         conn.on('open', () => {
-          // Announce ourselves to host
+          this._reconnectAttempt = 0
           this.send(PlatformEvents.PLAYER_JOINED, {
             player: playerManager.getLocalPlayer(),
           })
@@ -74,7 +93,11 @@ class PeerJSAdapter implements NetworkAPI {
         })
 
         conn.on('close', () => {
-          eventBus.emit(PlatformEvents.ROOM_CLOSED, { message: 'Host disconnected' })
+          if (this._intentionalDisconnect) {
+            eventBus.emit(PlatformEvents.ROOM_CLOSED, { message: 'Host disconnected' })
+            return
+          }
+          this._scheduleReconnect()
         })
 
         conn.on('error', (err) => {
@@ -82,7 +105,14 @@ class PeerJSAdapter implements NetworkAPI {
           eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
           reject(err)
         })
-      })
+      }
+
+      // If peer already open, connect immediately
+      if (this.peer.id) {
+        doConnect(this.peer.id)
+      } else {
+        this.peer.on('open', doConnect)
+      }
 
       this.peer.on('error', (err) => {
         const msg = (err as Error).message ?? String(err)
@@ -90,6 +120,28 @@ class PeerJSAdapter implements NetworkAPI {
         reject(err)
       })
     })
+  }
+
+  private _scheduleReconnect(): void {
+    if (this._reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+      eventBus.emit(PlatformEvents.ROOM_CLOSED, { message: 'Lost connection to host' })
+      return
+    }
+
+    const delay = RECONNECT_BASE_MS * Math.pow(2, this._reconnectAttempt)
+    this._reconnectAttempt++
+
+    eventBus.emit(PlatformEvents.ROOM_ERROR, {
+      message: `Connection lost — reconnecting (attempt ${this._reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})…`,
+    })
+
+    this._reconnectTimer = setTimeout(async () => {
+      try {
+        await this._connectToHost()
+      } catch {
+        // error already emitted inside _connectToHost
+      }
+    }, delay)
   }
 
   private handleIncomingConnection(conn: DataConnection): void {
@@ -193,6 +245,11 @@ class PeerJSAdapter implements NetworkAPI {
   // ── Cleanup ───────────────────────────────────────────────────────────────
 
   disconnect(): void {
+    this._intentionalDisconnect = true
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer)
+      this._reconnectTimer = null
+    }
     this.connections.forEach((conn) => conn.close())
     this.connections.clear()
     this.hostConnection?.close()
@@ -201,6 +258,8 @@ class PeerJSAdapter implements NetworkAPI {
     this.peer = null
     this._peerId = ''
     this._isHost = false
+    this._hostId = ''
+    this._reconnectAttempt = 0
     this.listeners.clear()
     playerManager.clearRoom()
   }

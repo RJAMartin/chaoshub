@@ -178,18 +178,42 @@ export class ReactionTestGame implements GameInstance {
 
     let count = 3
     this.countdownText.text = String(count)
+    this.animateCountdownPulse(count)
+    this.ctx.sound.beep(440, 0.08, 0.15)
 
     this.countdownInterval = setInterval(() => {
       count--
       if (count > 0) {
         this.countdownText.text = String(count)
+        this.animateCountdownPulse(count)
+        this.ctx.sound.beep(440, 0.08, 0.15)
       } else {
         clearInterval(this.countdownInterval!)
         this.countdownInterval = null
-        this.countdownText.text = ''
+        this.countdownText.text = 'GO!'
+        this.ctx.sound.beep(880, 0.12, 0.2)
+        setTimeout(() => { this.countdownText.text = '' }, 400)
         this.showReady()
       }
     }, 1000)
+  }
+
+  private animateCountdownPulse(n: number): void {
+    const { width: w, height: h } = this.app.screen
+    const size = Math.min(w * 0.18, 140)
+    ;(this.countdownText.style as TextStyle).fontSize = size
+    this.countdownText.position.set(w / 2, h / 2 + 40)
+    // Shrink back over 800ms
+    let elapsed = 0
+    const target = Math.min(w * 0.06, 48)
+    const animate = () => {
+      elapsed += 16
+      const t = Math.min(elapsed / 800, 1)
+      const current = size + (target - size) * t
+      ;(this.countdownText.style as TextStyle).fontSize = current
+      if (t < 1) requestAnimationFrame(animate)
+    }
+    requestAnimationFrame(animate)
   }
 
   private showReady(): void {

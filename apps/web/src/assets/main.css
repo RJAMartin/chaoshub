@@ -39,6 +39,15 @@
   box-sizing: border-box;
 }
 
+/* Global keyboard focus indicator */
+:focus-visible {
+  outline: 2px solid var(--color-neon-cyan);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 html {
   height: 100%;
   font-size: 16px;

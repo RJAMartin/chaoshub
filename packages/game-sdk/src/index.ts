@@ -98,6 +98,16 @@ export interface AchievementAPI {
 // Game Context — the single object games receive to interact with the platform
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
+// Sound API
+// ---------------------------------------------------------------------------
+export interface SoundAPI {
+  beep(frequency: number, duration: number, volume?: number): void
+  success(): void
+  fail(): void
+  resume(): Promise<void>
+}
+
+// ---------------------------------------------------------------------------
 // Pixi Application — imported as a type-only reference so the SDK package
 // does not need pixi.js as a dependency. Games cast as needed.
 // ---------------------------------------------------------------------------
@@ -115,6 +125,7 @@ export interface GameContext {
   achievements: AchievementAPI
   stats: StatisticsAPI
   events: IEventBus
+  sound: SoundAPI
 }
 
 // ---------------------------------------------------------------------------

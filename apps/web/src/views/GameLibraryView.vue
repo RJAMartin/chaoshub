@@ -54,12 +54,12 @@ function handleSelect(gameId: string): void {
 </script>
 
 <style scoped>
-.library-view { flex: 1; padding: 3rem 1.5rem; }
+.library-view { flex: 1; padding: 3rem 1rem; }
 .library-inner { max-width: 1200px; margin: 0 auto; }
 .library-header { margin-bottom: 2.5rem; }
-.library-title { font-size: 2rem; font-weight: 800; margin: 0 0 0.375rem; }
+.library-title { font-size: clamp(1.5rem, 5vw, 2rem); font-weight: 800; margin: 0 0 0.375rem; }
 .library-subtitle { color: var(--color-text-muted); font-size: 0.875rem; }
-.games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.25rem; }
+.games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); gap: 1.25rem; }
 .empty-state { text-align: center; padding: 4rem; color: var(--color-text-muted); }
 .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
 .empty-text { font-size: 1rem; }

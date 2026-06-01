@@ -229,8 +229,13 @@ const features = [
 .feature-desc { font-size: 0.8125rem; color: var(--color-text-secondary); line-height: 1.5; }
 
 @media (max-width: 768px) {
-  .hero { grid-template-columns: 1fr; gap: 2rem; padding: 3rem 1.25rem; min-height: auto; }
+  .hero { grid-template-columns: 1fr; gap: 2rem; padding: 2.5rem 1rem; min-height: auto; }
   .hero-visual { display: none; }
+}
+
+@media (max-width: 400px) {
+  .hero-actions { max-width: 100%; }
+  .join-form { flex-direction: column; }
 }
 
 .network-error-banner {

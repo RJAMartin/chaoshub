@@ -11,6 +11,8 @@ import { StatisticsService } from '@/core/services/statistics/statistics-service
 import { GameAchievementAPI } from '@/core/services/achievements/achievement-engine'
 import { eventBus } from '@/core/events/event-bus'
 
+import { soundManager } from '@/core/services/sound/sound-manager'
+
 export function createGameContext(gameId: string, pixiApp: Application): GameContext {
   return {
     gameId,
@@ -21,5 +23,6 @@ export function createGameContext(gameId: string, pixiApp: Application): GameCon
     stats: new StatisticsService(gameId),
     achievements: new GameAchievementAPI(),
     events: eventBus,
+    sound: soundManager,
   }
 }

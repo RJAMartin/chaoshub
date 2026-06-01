@@ -3,13 +3,22 @@
     <div class="code-label">Room Code</div>
     <div class="code-display">
       <span class="code-text font-mono">{{ code }}</span>
-      <button class="btn btn-ghost btn-sm copy-btn" @click="copyCode" :class="{ copied }">
+      <button
+        class="btn btn-ghost btn-sm copy-btn"
+        :class="{ copied }"
+        :aria-label="copied ? 'Copied!' : 'Copy room code'"
+        @click="copyCode"
+      >
         {{ copied ? '✓ Copied' : 'Copy' }}
       </button>
     </div>
     <div class="share-link">
-      <span class="link-text">{{ shareUrl }}</span>
-      <button class="btn btn-ghost btn-sm" @click="copyLink">Share Link</button>
+      <span class="link-text" :title="shareUrl">{{ shareUrl }}</span>
+      <button
+        class="btn btn-ghost btn-sm"
+        aria-label="Copy share link to clipboard"
+        @click="copyLink"
+      >Share Link</button>
     </div>
   </div>
 </template>

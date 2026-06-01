@@ -18,20 +18,26 @@ class GameRegistry {
     if (this.initialized) return
     this.initialized = true
 
-    // Eagerly import all module.ts files under src/games/
+    // Lazily import all module.ts files under src/games/ — each becomes its own chunk
     const moduleFiles = import.meta.glob<{ default: GameModule }>(
-      '../../games/*/module.ts',
-      { eager: true }
+      '../../games/*/module.ts'
     )
 
-    for (const [path, mod] of Object.entries(moduleFiles)) {
-      const gameModule = mod.default
-      if (!gameModule?.id) {
-        console.warn(`[GameRegistry] Module at "${path}" missing default export or id — skipped.`)
-        continue
-      }
-      this.register(gameModule)
-    }
+    await Promise.all(
+      Object.entries(moduleFiles).map(async ([path, load]) => {
+        try {
+          const mod = await load()
+          const gameModule = mod.default
+          if (!gameModule?.id) {
+            console.warn(`[GameRegistry] Module at "${path}" missing default export or id — skipped.`)
+            return
+          }
+          this.register(gameModule)
+        } catch (err) {
+          console.error(`[GameRegistry] Failed to load module at "${path}":`, err)
+        }
+      })
+    )
 
     console.info(`[GameRegistry] Loaded ${this.modules.size} game(s): ${[...this.modules.keys()].join(', ')}`)
   }
@@ -63,3 +69,4 @@ class GameRegistry {
 
 // Global singleton
 export const gameRegistry = new GameRegistry()
+export { GameRegistry }

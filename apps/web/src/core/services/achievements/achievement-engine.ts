@@ -118,6 +118,7 @@ class AchievementEngine {
 
 // Global singleton
 export const achievementEngine = new AchievementEngine()
+export { AchievementEngine }
 
 // ── Per-game AchievementAPI adapter ──────────────────────────────────────────
 export class GameAchievementAPI implements AchievementAPI {

@@ -41,4 +41,4 @@ class EventBus implements IEventBus {
 
 // Global singleton — the platform's single event bus instance
 export const eventBus = new EventBus()
-export type { EventBus }
+export { EventBus }

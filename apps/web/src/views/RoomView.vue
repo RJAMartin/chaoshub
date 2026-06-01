@@ -59,7 +59,8 @@
               <button
                 v-if="roomStore.isHost && player.id !== playerStore.localPlayer.id"
                 class="btn btn-ghost btn-sm kick-btn"
-                title="Kick player"
+                :aria-label="`Kick ${player.name}`"
+                :title="`Kick ${player.name}`"
                 @click="roomStore.kickPlayer(player.id)"
               >✕</button>
             </div>
@@ -69,6 +70,7 @@
             v-if="!roomStore.isHost"
             class="btn ready-btn"
             :class="playerStore.localPlayer.isReady ? 'btn-danger' : 'btn-secondary'"
+            :aria-pressed="playerStore.localPlayer.isReady"
             @click="toggleReady"
           >
             {{ playerStore.localPlayer.isReady ? '✗ Unready' : '✓ Ready' }}
@@ -82,7 +84,7 @@
           <div v-if="availableGames.length === 0" class="no-games">
             No games available.
           </div>
-          <div v-else class="game-picker-grid">
+          <div v-else class="game-picker-grid" role="listbox" aria-label="Select a game">
             <GameCard
               v-for="game in availableGames"
               :key="game.id"
@@ -97,6 +99,8 @@
             <button
               class="btn btn-primary start-btn"
               :disabled="!canStart"
+              :aria-disabled="!canStart"
+              :aria-label="startButtonLabel"
               @click="handleStartGame"
             >
               {{ startButtonLabel }}
@@ -285,7 +289,7 @@ function onCanvasDestroyed(): void {
 .post-game { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
 
 /* Lobby */
-.lobby { flex: 1; padding: 2rem 1.5rem; overflow-y: auto; }
+.lobby { flex: 1; padding: 1.5rem 1rem; overflow-y: auto; }
 .lobby-inner {
   max-width: 1100px;
   margin: 0 auto;
@@ -315,7 +319,7 @@ function onCanvasDestroyed(): void {
 
 .game-picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
   gap: 0.875rem;
 }
 .no-games { color: var(--color-text-muted); font-size: 0.875rem; }
@@ -357,13 +361,15 @@ function onCanvasDestroyed(): void {
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  padding: 2.5rem 3rem;
+  padding: 2rem 1.5rem;
   background: var(--color-surface);
   border: 1px solid rgba(255, 107, 107, 0.4);
   border-radius: 16px;
   box-shadow: 0 0 40px rgba(255, 45, 120, 0.2);
   text-align: center;
   max-width: 380px;
+  width: calc(100% - 2rem);
+  margin: 0 1rem;
 }
 .disconnect-icon { font-size: 3rem; }
 .disconnect-title { font-size: 1.25rem; font-weight: 800; color: #ff6b6b; }

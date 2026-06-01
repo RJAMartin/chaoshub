@@ -2,7 +2,7 @@
 
 ## Status: Live at https://rjamartin.github.io/chaoshub/
 
-Last updated: Session 4
+Last updated: Session 5
 
 ---
 
@@ -193,11 +193,46 @@ Last updated: Session 4
 ### Low Priority / Future
 - [ ] Spectator mode (PlayerRole = 'spectator')
 - [ ] Host migration on disconnect
-- [ ] PWA support (vite-plugin-pwa)
+- [x] PWA support — vite-plugin-pwa added (Session 5)
 - [ ] Self-hosted PeerJS server option
 - [ ] Supabase adapter for cross-device profiles
 - [ ] Tournament brackets
 - [ ] AI player support
+
+---
+
+## Session 5 — Polish, PWA, Reconnection, Responsive
+
+### Completed
+- [x] **SoundManager** (`apps/web/src/core/services/sound/sound-manager.ts`) — Web Audio API helper
+  - `beep(freq, dur, vol)`, `success()`, `fail()`, `resume()`
+  - Added `SoundAPI` interface to game SDK (`packages/game-sdk/src/index.ts`)
+  - Wired into `GameContext` via `createGameContext()` — all games can use `ctx.sound`
+- [x] **Reaction Test polish**
+  - Animated Pixi countdown: numbers scale-pulse from large → normal over 800ms using `requestAnimationFrame`
+  - Web Audio beep on each countdown tick (440 Hz) and GO! signal (880 Hz)
+- [x] **Network reconnection with exponential backoff** (`peer-adapter.ts`)
+  - Client-side: on unexpected `conn.close`, schedules retry at 1s/2s/4s/8s (4 attempts max)
+  - Emits `ROOM_ERROR` with attempt progress; `ROOM_CLOSED` only after all attempts fail
+  - `_intentionalDisconnect` flag prevents retry on explicit `disconnect()` or kick
+  - Reuses existing `Peer` object if still alive; creates new one if destroyed
+- [x] **Responsive audit** — fixed layout breakages at 320px
+  - `GameLibraryView`: `minmax(min(160px, 100%), 1fr)` prevents overflow, `clamp()` title font
+  - `RoomView`: game-picker-grid `minmax(min(140px, 100%), 1fr)`, lobby padding reduced
+  - `HomeView`: at 400px join-form stacks vertically
+  - disconnect-box gets `width: calc(100% - 2rem)` so it never overflows
+- [x] **PWA** — `vite-plugin-pwa` added to `vite.config.ts`
+  - Service worker in `generateSW` mode with `autoUpdate`
+  - Web app manifest (name, icons, theme_color, display: standalone)
+  - Workbox excludes large vendor chunks from precache; runtime caches Google Fonts
+  - PWA icons (`public/icons/pwa-192.png`, `pwa-512.png`) generated
+- [x] **TODO.md** fully updated; all newly done items marked `[DONE]`
+
+### Still Pending
+- [ ] Asset loader utility (Pixi `Assets`)
+- [ ] Performance: lazy-load Pixi only when entering a game
+- [ ] Unit test for GameLoop
+- [ ] Integration test: full create/join/start/end flow
 
 ---
 
