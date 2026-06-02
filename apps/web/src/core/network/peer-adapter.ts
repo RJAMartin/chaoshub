@@ -242,6 +242,23 @@ class PeerJSAdapter implements NetworkAPI {
     }
   }
 
+  /**
+   * Send a message to a specific connected peer. Host-only.
+   * Used to unicast information (e.g. the full player list) to a single client.
+   */
+  sendToPeer(peerId: string, event: string, payload: unknown): void {
+    if (!this._isHost) return
+    const conn = this.connections.get(peerId)
+    if (!conn) return
+    const msg: NetworkMessage = {
+      event,
+      payload,
+      from: this._peerId,
+      timestamp: Date.now(),
+    }
+    conn.send(msg)
+  }
+
   // ── Cleanup ───────────────────────────────────────────────────────────────
 
   disconnect(): void {
@@ -260,7 +277,7 @@ class PeerJSAdapter implements NetworkAPI {
     this._isHost = false
     this._hostId = ''
     this._reconnectAttempt = 0
-    this.listeners.clear()
+    // Do NOT clear listeners — stores register them once and must survive room sessions.
     playerManager.clearRoom()
   }
 }
