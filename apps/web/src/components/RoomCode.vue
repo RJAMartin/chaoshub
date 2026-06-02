@@ -32,8 +32,10 @@ const copied = ref(false)
 const linkCopied = ref(false)
 
 const shareUrl = computed(() => {
+  // With createWebHashHistory the router reads query params from the hash portion,
+  // so the link must be  …/#/?join=CODE  (not  …/?join=CODE  on the path).
   const base = window.location.origin + window.location.pathname
-  return `${base}?join=${props.code}`
+  return `${base}#/?join=${props.code}`
 })
 
 async function copyCode(): Promise<void> {

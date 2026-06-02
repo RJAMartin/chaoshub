@@ -28,8 +28,9 @@
             <input
               v-model="joinCode"
               class="input join-input"
-              placeholder="Enter room code…"
-              maxlength="32"
+              placeholder="e.g. ABC123"
+              maxlength="6"
+              style="text-transform: uppercase"
               @keydown.enter="handleJoinRoom"
             />
             <button class="btn btn-secondary" @click="handleJoinRoom" :disabled="!joinCode || roomStore.isConnecting">
@@ -84,13 +85,22 @@ const onNetworkError = (payload: unknown) => {
 eventBus.on(PlatformEvents.ROOM_ERROR, onNetworkError)
 onUnmounted(() => { eventBus.off(PlatformEvents.ROOM_ERROR, onNetworkError) })
 
-// Auto-join if ?join=CODE is present in the URL
+// Auto-join if ?join=CODE is present in the URL (e.g. from a share link)
 onMounted(async () => {
-  const code = route.query['join'] as string | undefined
-  if (code) {
-    joinCode.value = code
-    await roomStore.joinRoom(code.trim())
-    router.push(`/room/${code.trim()}`)
+  const raw = route.query['join'] as string | undefined
+  if (raw) {
+    const result = validateRoomCode(raw)
+    if (!result.ok) {
+      joinError.value = `Invalid share link: ${result.error}`
+      return
+    }
+    joinCode.value = result.code
+    try {
+      await roomStore.joinRoom(result.code)
+      router.push(`/room/${result.code}`)
+    } catch {
+      // error already set on roomStore.error
+    }
   }
 })
 

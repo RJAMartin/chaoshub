@@ -11,14 +11,16 @@ export function sanitizeText(input: string): string {
 }
 
 /**
- * Validate and sanitize a room code.
- * PeerJS peer IDs are alphanumeric + hyphens, variable length.
+ * Validate and normalise a room code.
+ * Room codes are exactly 6 uppercase alphanumeric characters (e.g. "ABC123").
+ * Input is normalised: lowercased letters are uppercased, whitespace stripped.
+ * The returned `code` is always 6 uppercase chars ready for use.
  */
 export function validateRoomCode(raw: string): { ok: true; code: string } | { ok: false; error: string } {
-  const code = raw.trim().replace(/[^a-zA-Z0-9\-_]/g, '')
+  // Normalise: uppercase, strip everything that isn't A-Z or 0-9
+  const code = raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
   if (!code) return { ok: false, error: 'Room code cannot be empty.' }
-  if (code.length < 4) return { ok: false, error: 'Room code is too short.' }
-  if (code.length > 64) return { ok: false, error: 'Room code is too long.' }
+  if (code.length !== 6) return { ok: false, error: 'Room code must be exactly 6 characters (e.g. ABC123).' }
   return { ok: true, code }
 }
 

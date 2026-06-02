@@ -123,6 +123,7 @@ import { gameRegistry } from '@/core/registry/index'
 import { networkAdapter } from '@/core/network/index'
 import { eventBus } from '@/core/events/event-bus'
 import { PlatformEvents } from '@/core/events/platform-events'
+import { validateRoomCode } from '@/core/utils/validation'
 import GameCanvas from '@/components/GameCanvas.vue'
 import PlayerCard from '@/components/PlayerCard.vue'
 import GameCard from '@/components/GameCard.vue'
@@ -165,13 +166,19 @@ onMounted(async () => {
   eventBus.on(PlatformEvents.ROOM_CLOSED, handleRoomClosed)
 
   if (!roomStore.isInRoom) {
-    const code = route.params['id'] as string
-    try {
-      await roomStore.joinRoom(code)
-    } catch {
-      // error is set on the store
-    } finally {
+    const raw = route.params['id'] as string
+    const result = validateRoomCode(raw)
+    if (!result.ok) {
+      roomStore.error = `Invalid room code: ${result.error}`
       autoJoinAttempted.value = true
+    } else {
+      try {
+        await roomStore.joinRoom(result.code)
+      } catch {
+        // error is set on the store
+      } finally {
+        autoJoinAttempted.value = true
+      }
     }
   }
 

@@ -6,6 +6,10 @@
 //   - Client: connects to host peer ID (= room code), sends actions to host
 //
 // Message envelope: { event, payload, from, timestamp }
+//
+// Room codes: 6-char alphanumeric (e.g. "ABC123").
+// Internally the PeerJS peer ID is prefixed: "csh-ABC123".
+// Users only see/type the short 6-char code.
 // ─────────────────────────────────────────────────────────────────────────────
 import Peer, { type DataConnection } from 'peerjs'
 import type { NetworkAPI, NetworkMessage } from '@chaoshub/game-sdk'
@@ -17,6 +21,31 @@ type NetworkCallback = (msg: NetworkMessage) => void
 
 const MAX_RECONNECT_ATTEMPTS = 4
 const RECONNECT_BASE_MS = 1000
+const PEER_ID_PREFIX = 'csh-'
+
+// Unambiguous characters — no 0/O, 1/I/L confusion
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+/** Generate a random 6-char room code. */
+function generateRoomCode(): string {
+  let code = ''
+  for (let i = 0; i < 6; i++) {
+    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]
+  }
+  return code
+}
+
+/** Short code (user-facing) → full PeerJS peer ID. */
+export function codeToPeerId(code: string): string {
+  return `${PEER_ID_PREFIX}${code.toUpperCase()}`
+}
+
+/** Full PeerJS peer ID → short code (user-facing). */
+export function peerIdToCode(peerId: string): string {
+  return peerId.startsWith(PEER_ID_PREFIX)
+    ? peerId.slice(PEER_ID_PREFIX.length).toUpperCase()
+    : peerId.toUpperCase()
+}
 
 class PeerJSAdapter implements NetworkAPI {
   private peer: Peer | null = null
@@ -35,23 +64,35 @@ class PeerJSAdapter implements NetworkAPI {
   // ── Setup ────────────────────────────────────────────────────────────────
 
   async initAsHost(): Promise<string> {
-    return new Promise((resolve, reject) => {
-      this.peer = new Peer()
+    return this._tryInitAsHost(generateRoomCode(), 0)
+  }
 
-      this.peer.on('open', (id) => {
-        this._peerId = id
+  private _tryInitAsHost(code: string, attempt: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const peerId = codeToPeerId(code)
+      this.peer = new Peer(peerId)
+
+      this.peer.on('open', () => {
+        this._peerId = peerId
         this._isHost = true
         playerManager.promoteToHost()
 
-        // Accept incoming connections
         this.peer!.on('connection', (conn) => {
           this.handleIncomingConnection(conn)
         })
 
-        resolve(id)
+        resolve(code) // ← return the short code, not the full peer ID
       })
 
       this.peer.on('error', (err) => {
+        // 'unavailable-id' means the code is already taken — retry with a fresh code
+        const errType = (err as { type?: string }).type
+        if (errType === 'unavailable-id' && attempt < 5) {
+          this.peer?.destroy()
+          this.peer = null
+          this._tryInitAsHost(generateRoomCode(), attempt + 1).then(resolve).catch(reject)
+          return
+        }
         const msg = (err as Error).message ?? String(err)
         eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
         reject(err)
@@ -59,8 +100,8 @@ class PeerJSAdapter implements NetworkAPI {
     })
   }
 
-  async initAsClient(hostId: string): Promise<void> {
-    this._hostId = hostId
+  async initAsClient(code: string): Promise<void> {
+    this._hostId = codeToPeerId(code) // convert short code to full peer ID
     this._reconnectAttempt = 0
     this._intentionalDisconnect = false
     return this._connectToHost()
