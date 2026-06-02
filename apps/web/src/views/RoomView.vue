@@ -348,8 +348,17 @@ function onCanvasDestroyed(): void {
 .waiting-for-host { font-size: 0.8125rem; color: var(--color-text-muted); }
 
 @media (max-width: 768px) {
-  .lobby-inner { grid-template-columns: 1fr; }
+  .lobby { padding: 1rem 0.75rem; }
+  .lobby-inner { grid-template-columns: 1fr; gap: 1.25rem; }
   .lobby-left { position: static; }
+  /* On mobile, show game picker first so players can pick before scrolling to start */
+  .lobby-right { order: -1; }
+  .start-btn { font-size: 0.9375rem; }
+}
+
+@media (max-width: 400px) {
+  .game-picker-grid { grid-template-columns: 1fr; }
+  .lobby { padding: 0.75rem 0.5rem; }
 }
 
 /* Disconnect overlay */

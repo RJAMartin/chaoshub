@@ -85,7 +85,7 @@ const thumbEmoji = computed(() => {
 .game-info { padding: 1rem; }
 .game-name { font-weight: 700; font-size: 0.9375rem; color: var(--color-text-primary); }
 .game-description {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--color-text-secondary);
   margin-top: 0.25rem;
   line-height: 1.4;

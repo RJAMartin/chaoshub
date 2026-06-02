@@ -62,8 +62,8 @@ async function copyLink(): Promise<void> {
 .code-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em; color: var(--color-text-muted); text-transform: uppercase; margin-bottom: 0.5rem; }
 .code-display { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
 .code-text { font-size: 1.25rem; font-weight: 700; color: var(--color-neon-cyan); letter-spacing: 0.05em; }
-.share-link { display: flex; align-items: center; gap: 0.5rem; }
-.link-text { font-size: 0.6875rem; color: var(--color-text-muted); font-family: var(--font-mono); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-link { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.link-text { font-size: 0.6875rem; color: var(--color-text-muted); font-family: var(--font-mono); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .btn-sm { padding: 0.25rem 0.625rem; font-size: 0.75rem; }
 .copy-btn.copied { color: var(--color-neon-green); border-color: var(--color-neon-green); }
 </style>

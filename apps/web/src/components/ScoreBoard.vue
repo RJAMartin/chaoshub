@@ -66,12 +66,19 @@ function rankEmoji(rank: number): string {
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
+  padding: 0 0.5rem;
 }
 .scoreboard-inner {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   padding: 2rem;
+}
+
+@media (max-width: 480px) {
+  .scoreboard-inner { padding: 1.25rem 1rem; gap: 1rem; }
+  .sb-trophy { font-size: 2rem; }
+  .sb-title { font-size: 1.375rem; }
 }
 
 .sb-header { text-align: center; }

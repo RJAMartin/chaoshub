@@ -114,6 +114,12 @@ class PeerJSAdapter implements NetworkAPI {
         this.peer = new Peer()
       }
 
+      // Once the DataChannel opens we consider the join successful.
+      // A peer-level error (e.g. signaling server hiccup) that fires AFTER
+      // the DataChannel is open should NOT reject — WebRTC connections survive
+      // signaling disconnections.
+      let channelOpen = false
+
       const doConnect = (id: string) => {
         this._peerId = id
         this._isHost = false
@@ -122,6 +128,7 @@ class PeerJSAdapter implements NetworkAPI {
         this.hostConnection = conn
 
         conn.on('open', () => {
+          channelOpen = true
           this._reconnectAttempt = 0
           this.send(PlatformEvents.PLAYER_JOINED, {
             player: playerManager.getLocalPlayer(),
@@ -134,17 +141,14 @@ class PeerJSAdapter implements NetworkAPI {
         })
 
         conn.on('close', () => {
-          if (this._intentionalDisconnect) {
-            eventBus.emit(PlatformEvents.ROOM_CLOSED, { message: 'Host disconnected' })
-            return
-          }
+          if (this._intentionalDisconnect) return
           this._scheduleReconnect()
         })
 
         conn.on('error', (err) => {
           const msg = (err as Error).message ?? String(err)
           eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
-          reject(err)
+          if (!channelOpen) reject(err)
         })
       }
 
@@ -156,9 +160,17 @@ class PeerJSAdapter implements NetworkAPI {
       }
 
       this.peer.on('error', (err) => {
+        const errType = (err as { type?: string }).type
         const msg = (err as Error).message ?? String(err)
-        eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
-        reject(err)
+        // 'peer-unavailable' means the room code doesn't exist — fatal for join.
+        // Other peer-level errors (network, disconnected) after the DataChannel
+        // opened are non-fatal: the connection survives, only warn via ROOM_ERROR.
+        if (!channelOpen || errType === 'peer-unavailable') {
+          eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
+          reject(err)
+        } else {
+          eventBus.emit(PlatformEvents.ROOM_ERROR, { message: msg })
+        }
       })
     })
   }

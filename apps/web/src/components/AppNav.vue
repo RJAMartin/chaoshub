@@ -127,8 +127,10 @@ const menuOpen = ref(false)
 
 @media (max-width: 640px) {
   .nav-links { display: none; }
-  .nav-room-badge { display: none; }
   .hamburger { display: flex; }
+  /* On mobile, show a compact room badge (code only, no Leave button) */
+  .nav-room-badge { padding: 0.2rem 0.5rem; gap: 0.375rem; }
+  .nav-room-badge .btn { display: none; }
 }
 
 .hamburger {

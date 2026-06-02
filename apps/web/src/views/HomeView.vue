@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useRoomStore } from '@/stores/index.js'
 import { validateRoomCode } from '@/core/utils/validation'
@@ -77,6 +77,15 @@ const roomStore = useRoomStore()
 const joinCode = ref('')
 const joinError = ref('')
 const networkError = ref('')
+
+// Safety net: if the store transitions to in-room (e.g. after a peer-level error
+// that caused joinRoom() to throw despite the DataChannel opening successfully),
+// navigate to the room automatically.
+watch(() => roomStore.isInRoom, (inRoom) => {
+  if (inRoom && roomStore.roomCode) {
+    router.push(`/room/${roomStore.roomCode}`)
+  }
+})
 
 const onNetworkError = (payload: unknown) => {
   const msg = (payload as { message?: string })?.message ?? 'PeerJS signalling server unreachable.'
