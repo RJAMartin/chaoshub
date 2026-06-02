@@ -49,6 +49,22 @@
         <div class="lobby-left">
           <RoomCode :code="roomStore.roomCode!" />
 
+          <div v-if="roomStore.isHost" class="host-controls">
+            <div class="host-badge">👑 You are the host</div>
+            <button
+              class="btn btn-primary start-btn"
+              :disabled="!canStart"
+              :aria-disabled="!canStart"
+              :aria-label="startButtonLabel"
+              @click="handleStartGame"
+            >
+              {{ startButtonLabel }}
+            </button>
+          </div>
+          <div v-else class="waiting-for-host">
+            Waiting for host to start the game…
+          </div>
+
           <div class="section-label">Players ({{ playerStore.players.length }})</div>
           <TransitionGroup name="slide-up" tag="div" class="players-list">
             <div v-for="player in playerStore.players" :key="player.id" class="player-row">
@@ -92,22 +108,6 @@
               :selected="roomStore.selectedGameId === game.id"
               @select="(id) => roomStore.isHost && roomStore.selectGame(id)"
             />
-          </div>
-
-          <div v-if="roomStore.isHost" class="host-controls">
-            <div class="host-badge">👑 You are the host</div>
-            <button
-              class="btn btn-primary start-btn"
-              :disabled="!canStart"
-              :aria-disabled="!canStart"
-              :aria-label="startButtonLabel"
-              @click="handleStartGame"
-            >
-              {{ startButtonLabel }}
-            </button>
-          </div>
-          <div v-else class="waiting-for-host">
-            Waiting for host to start the game…
           </div>
         </div>
       </div>

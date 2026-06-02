@@ -13,9 +13,10 @@ export const usePlayerStore = defineStore('players', () => {
   const players = ref<Player[]>([playerManager.getLocalPlayer()])
 
   const localPlayer = computed(() => playerManager.getLocalPlayer())
-  const allReady = computed(() =>
-    players.value.length >= 2 && players.value.every((p) => p.isReady)
-  )
+  const allReady = computed(() => {
+    const nonHostPlayers = players.value.filter((p) => !p.isHost)
+    return players.value.length >= 2 && nonHostPlayers.length > 0 && nonHostPlayers.every((p) => p.isReady)
+  })
 
   function refresh(): void {
     players.value = playerManager.getPlayers()
