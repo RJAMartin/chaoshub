@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Graphics, Text, TextStyle, type Application } from 'pixi.js'
 import type { GameContext, GameInstance, NetworkMessage } from '@chaoshub/game-sdk'
+import { createGameUI } from '@/core/services/game-ui/game-ui'
 
 export const CG_EVENTS = {
   INPUT:  'coin-grab:input',
@@ -33,6 +34,7 @@ let _cid = 0
 export class CoinGrabGame implements GameInstance {
   private ctx: GameContext
   private app: Application
+  private ui = createGameUI()
 
   private stage!: Graphics
   private playerGfx: Map<string, Graphics> = new Map()
@@ -94,6 +96,20 @@ export class CoinGrabGame implements GameInstance {
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
 
+    await this.ui.showInstructions(this.ctx, {
+      title: '🪙 Coin Grab',
+      subtitle: 'Collect the most coins in 60 seconds',
+      lines: [
+        '🪙 Move your character to collect gold coins',
+        '⏱ You have 60 seconds — grab as many as you can',
+        '🏆 Most coins collected wins',
+      ],
+      controls: 'WASD or Arrow keys to move',
+      accentColor: 0xffd60a,
+    })
+    await this.ui.countdown(this.ctx)
+    this.ui.clear()
+
     if (this.ctx.network.isHost()) {
       const ps = this.ctx.players.getPlayers()
       const starts = [[100, 100], [LOGIC_W - 100, 100], [100, LOGIC_H - 100], [LOGIC_W - 100, LOGIC_H - 100], [LOGIC_W / 2, 80], [LOGIC_W / 2, LOGIC_H - 80]]
@@ -129,6 +145,7 @@ export class CoinGrabGame implements GameInstance {
     this.ctx.network.off(CG_EVENTS.INPUT,  this.onInput as never)
     this.ctx.network.off(CG_EVENTS.STATE,  this.onState as never)
     this.ctx.network.off(CG_EVENTS.WINNER, this.onWinner as never)
+    this.ui.destroy()
     this.app.stage.removeChildren()
   }
 

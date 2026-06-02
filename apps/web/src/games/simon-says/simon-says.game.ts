@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Graphics, Text, TextStyle, type Application } from 'pixi.js'
 import type { GameContext, GameInstance, NetworkMessage } from '@chaoshub/game-sdk'
+import { createGameUI } from '@/core/services/game-ui/game-ui'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,7 @@ const FLASH_OFF_MS = 200
 export class SimonSaysGame implements GameInstance {
   private ctx: GameContext
   private app: Application
+  private ui = createGameUI()
 
   // Scene
   private stage!: Graphics
@@ -110,8 +112,23 @@ export class SimonSaysGame implements GameInstance {
     this.ctx.network.on(SS_EVENTS.ELIMINATED,    this.onEliminated as never)
     this.ctx.network.on(SS_EVENTS.WINNER,        this.onWinner as never)
 
+    await this.ui.showInstructions(this.ctx, {
+      title: '🧠 Simon Says',
+      subtitle: 'Watch the sequence. Repeat it. Don\'t make mistakes.',
+      lines: [
+        '👀 Watch the coloured buttons light up in order',
+        '🎯 Repeat the exact same sequence by clicking the buttons',
+        '❌ One wrong press and you\'re eliminated!',
+        '🏆 Last player to survive wins',
+      ],
+      controls: 'Click / Tap the coloured buttons',
+      accentColor: 0xbf5af2,
+    })
+    await this.ui.countdown(this.ctx)
+    this.ui.clear()
+
     if (this.ctx.network.isHost()) {
-      setTimeout(() => this.nextRound(), 800)
+      setTimeout(() => this.nextRound(), 400)
     }
   }
 
@@ -124,6 +141,7 @@ export class SimonSaysGame implements GameInstance {
     this.ctx.network.off(SS_EVENTS.ROUND_RESULT,  this.onRoundResult as never)
     this.ctx.network.off(SS_EVENTS.ELIMINATED,    this.onEliminated as never)
     this.ctx.network.off(SS_EVENTS.WINNER,        this.onWinner as never)
+    this.ui.destroy()
     this.app.stage.removeChildren()
   }
 

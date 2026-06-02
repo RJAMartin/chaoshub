@@ -1,13 +1,14 @@
 // Button Mash — click/tap as fast as possible in 10 seconds. Most clicks wins.
 import { Graphics, Text, TextStyle, type Application } from 'pixi.js'
 import type { GameContext, GameInstance, NetworkMessage } from '@chaoshub/game-sdk'
+import { createGameUI } from '@/core/services/game-ui/game-ui'
 
 export const BTN_EVENTS = { STATE: 'button-mash:state', FINAL: 'button-mash:final' } as const
 const LOGIC_W = 600, LOGIC_H = 480, GAME_MS = 10000
 const PLAYER_COLORS = [0x00f5ff, 0xff2d78, 0xffd60a, 0x30d158, 0xbf5af2, 0xff9f0a]
 
 export class ButtonMashGame implements GameInstance {
-  private ctx: GameContext; private app: Application
+  private ctx: GameContext; private app: Application; private ui = createGameUI()
   private stage!: Graphics; private btnGfx!: Graphics; private countText!: Text
   private timerText!: Text; private scoreText!: Text; private statusText!: Text
   private localCount = 0; private scores = new Map<string, number>()
@@ -34,6 +35,21 @@ export class ButtonMashGame implements GameInstance {
     this.buildScene()
     this.ctx.network.on(BTN_EVENTS.STATE, this.onState as never)
     this.ctx.network.on(BTN_EVENTS.FINAL, this.onFinal as never)
+
+    await this.ui.showInstructions(this.ctx, {
+      title: '👊 Button Mash',
+      subtitle: 'Mash the button as fast as you can for 10 seconds',
+      lines: [
+        '💥 Click or tap the big button as many times as possible',
+        '⚡ 10 seconds on the clock — every tap counts',
+        '🏆 Most clicks wins',
+      ],
+      controls: 'Click / Tap (or Space / Enter)',
+      accentColor: 0xff2d78,
+    })
+    await this.ui.countdown(this.ctx)
+    this.ui.clear()
+
     this.startTime = Date.now()
     if (this.ctx.network.isHost()) {
       this.tickTimer = setInterval(() => {
@@ -56,6 +72,7 @@ export class ButtonMashGame implements GameInstance {
     if (this.tickTimer) clearInterval(this.tickTimer)
     this.ctx.network.off(BTN_EVENTS.STATE, this.onState as never)
     this.ctx.network.off(BTN_EVENTS.FINAL, this.onFinal as never)
+    this.ui.destroy()
     this.app.stage.removeChildren()
   }
 

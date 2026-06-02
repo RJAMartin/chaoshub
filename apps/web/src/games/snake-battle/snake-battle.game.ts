@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Graphics, Text, TextStyle, type Application } from 'pixi.js'
 import type { GameContext, GameInstance, NetworkMessage } from '@chaoshub/game-sdk'
+import { createGameUI } from '@/core/services/game-ui/game-ui'
 
 export const SB_EVENTS = {
   DIRECTION: 'snake-battle:direction',
@@ -48,6 +49,7 @@ function rnd(n: number) { return Math.floor(Math.random() * n) }
 export class SnakeBattleGame implements GameInstance {
   private ctx: GameContext
   private app: Application
+  private ui = createGameUI()
 
   private stage!: Graphics
   private gridGfx!: Graphics
@@ -107,6 +109,20 @@ export class SnakeBattleGame implements GameInstance {
     this.ctx.network.on(SB_EVENTS.WINNER,    this.onWinner as never)
     window.addEventListener('keydown', this.onKeyDown)
 
+    await this.ui.showInstructions(this.ctx, {
+      title: '🐍 Snake Battle',
+      subtitle: 'Last snake alive wins',
+      lines: [
+        '🍕 Eat yellow pellets to grow and score points',
+        '💀 Hit a wall or any snake body = instant death',
+        '👑 Last snake alive (or highest score) wins',
+      ],
+      controls: 'WASD or Arrow keys to steer',
+      accentColor: 0x30d158,
+    })
+    await this.ui.countdown(this.ctx)
+    this.ui.clear()
+
     if (this.ctx.network.isHost()) {
       this.initWorld()
       this.tickTimer = setInterval(() => this.tick(), TICK_MS)
@@ -135,6 +151,7 @@ export class SnakeBattleGame implements GameInstance {
     this.ctx.network.off(SB_EVENTS.DIRECTION, this.onDirection as never)
     this.ctx.network.off(SB_EVENTS.STATE,     this.onState as never)
     this.ctx.network.off(SB_EVENTS.WINNER,    this.onWinner as never)
+    this.ui.destroy()
     this.app.stage.removeChildren()
   }
 
@@ -309,40 +326,17 @@ export class SnakeBattleGame implements GameInstance {
 
   private showWinner(winnerId: string, winnerName: string): void {
     this.gameOver = true
-    this.stage.removeChildren()
-    this.stage.rect(0, 0, LOGIC_W, LOGIC_H).fill(0x080810)
-
-    const localId = this.ctx.players.getLocalPlayer().id
-    const isWinner = winnerId === localId
-    const t = new Text({
-      text: isWinner ? '🏆 YOU WIN!' : `${winnerName} wins!`,
-      style: new TextStyle({ fontFamily: 'monospace', fontSize: 38, fontWeight: '900', fill: isWinner ? '#ffd60a' : '#00f5ff' }),
-    })
-    t.anchor.set(0.5)
-    t.position.set(LOGIC_W / 2, LOGIC_H / 2 - 30)
-    this.stage.addChild(t)
-
     const sorted = [...this.snakes.values()].sort((a, b) => b.score - a.score)
-    sorted.forEach((s, i) => {
-      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`
-      const c = SNAKE_COLORS[s.colorIdx] ?? 0xffffff
-      const row = new Text({
-        text: `${medal}  ${s.name}  —  ${s.score} pellets`,
-        style: new TextStyle({ fontFamily: 'monospace', fontSize: 18, fill: `#${c.toString(16).padStart(6, '0')}` }),
-      })
-      row.anchor.set(0.5)
-      row.position.set(LOGIC_W / 2, LOGIC_H / 2 + 40 + i * 40)
-      this.stage.addChild(row)
-    })
+    const scoreLine = sorted.map((s, i) => `${['🥇','🥈','🥉'][i] ?? `${i+1}.`} ${s.name}: ${s.score}`).join('  ')
+    this.ui.showWinScreen(this.ctx, winnerId, winnerName, scoreLine, 0x30d158)
 
     if (this.ctx.network.isHost()) {
       this.ctx.stats.record('play')
-      if (isWinner) this.ctx.stats.record('win')
+      const localId = this.ctx.players.getLocalPlayer().id
+      if (winnerId === localId) this.ctx.stats.record('win')
       else this.ctx.stats.record('loss')
       this.ctx.events.emit('platform:game:ended', {
-        gameId: this.ctx.gameId,
-        winnerId,
-        durationMs: 0,
+        gameId: this.ctx.gameId, winnerId, durationMs: 0,
         results: sorted.map((s, i) => ({ playerId: s.id, playerName: s.name, rank: i + 1, score: s.score })),
       })
     }

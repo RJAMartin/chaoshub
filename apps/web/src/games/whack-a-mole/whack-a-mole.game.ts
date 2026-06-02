@@ -1,6 +1,7 @@
 // Whack-a-Mole — moles pop up, click them before they hide. Most hits wins.
 import { Graphics, Text, TextStyle, Circle, type Application } from 'pixi.js'
 import type { GameContext, GameInstance, NetworkMessage } from '@chaoshub/game-sdk'
+import { createGameUI } from '@/core/services/game-ui/game-ui'
 
 export const WAM_EVENTS = { STATE: 'wam:state', HIT: 'wam:hit', FINAL: 'wam:final' } as const
 
@@ -18,7 +19,7 @@ const PLAYER_COLORS = [0x00f5ff, 0xff2d78, 0xffd60a, 0x30d158, 0xbf5af2, 0xff9f0
 interface MoleState { idx: number; visible: boolean; hitBy: string | null; hideAt: number }
 
 export class WhackAMoleGame implements GameInstance {
-  private ctx: GameContext; private app: Application
+  private ctx: GameContext; private app: Application; private ui = createGameUI()
   private stage!: Graphics
   private holeGfx: Graphics[] = []; private moleGfx: Graphics[] = []
   private scoreText!: Text; private timerText!: Text; private statusText!: Text
@@ -55,6 +56,22 @@ export class WhackAMoleGame implements GameInstance {
     this.ctx.network.on(WAM_EVENTS.STATE, this.onState as never)
     this.ctx.network.on(WAM_EVENTS.HIT,   this.onHit as never)
     this.ctx.network.on(WAM_EVENTS.FINAL, this.onFinal as never)
+
+    await this.ui.showInstructions(this.ctx, {
+      title: '🔨 Whack-a-Mole',
+      subtitle: '30 seconds to whack as many moles as possible',
+      lines: [
+        '🐭 Click or tap moles as they pop up to score',
+        '⚡ Moles disappear quickly — be fast!',
+        '🏆 Most whacks in 30 seconds wins',
+      ],
+      controls: 'Click / Tap to whack',
+      accentColor: 0xffd60a,
+    })
+    await this.ui.countdown(this.ctx)
+    this.ui.clear()
+
+    this.startTime = Date.now()
     if (this.ctx.network.isHost()) {
       this.tickTimer = setInterval(() => this.hostTick(), 100)
     }
@@ -67,6 +84,7 @@ export class WhackAMoleGame implements GameInstance {
     this.ctx.network.off(WAM_EVENTS.STATE, this.onState as never)
     this.ctx.network.off(WAM_EVENTS.HIT,   this.onHit as never)
     this.ctx.network.off(WAM_EVENTS.FINAL, this.onFinal as never)
+    this.ui.destroy()
     this.app.stage.removeChildren()
   }
 
