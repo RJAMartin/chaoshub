@@ -24,12 +24,29 @@ export const usePlayerStore = defineStore('players', () => {
   // Host: a new client connected and sent PLAYER_JOINED
   networkAdapter.on(PlatformEvents.PLAYER_JOINED, (msg) => {
     const payload = msg.payload as { player: Player }
-    playerManager.addPlayer(payload.player)
-    // Relay to all clients if we are host
-    if (networkAdapter.isHost()) {
-      // Send current player list back to the new joiner
+
+    // Only relay when the message originated from a remote peer (not from a
+    // local broadcast echo), to prevent infinite recursion.
+    if (networkAdapter.isHost() && msg.from !== networkAdapter.getPeerId()) {
+      // Send the full current player list to the newcomer so they see
+      // everyone who was already in the room.
+      const existingPlayers = playerManager.getPlayers()
+      for (const existing of existingPlayers) {
+        if (existing.id !== payload.player.id) {
+          networkAdapter.sendToPeer(msg.from, PlatformEvents.PLAYER_JOINED, { player: existing })
+        }
+      }
+
+      // Register the new player locally first so broadcast includes them
+      playerManager.addPlayer(payload.player)
+
+      // Broadcast the newcomer to all already-connected clients.
       networkAdapter.broadcast(PlatformEvents.PLAYER_JOINED, payload)
+    } else {
+      // Client path: just record the player.
+      playerManager.addPlayer(payload.player)
     }
+
     refresh()
     eventBus.emit(PlatformEvents.PLAYER_JOINED, payload)
   })
@@ -45,7 +62,9 @@ export const usePlayerStore = defineStore('players', () => {
   networkAdapter.on(PlatformEvents.PLAYER_READY, (msg) => {
     const payload = msg.payload as { playerId: string; isReady: boolean }
     playerManager.updatePlayer(payload.playerId, { isReady: payload.isReady })
-    if (networkAdapter.isHost()) {
+    // Relay to all clients only when the message came from a remote peer,
+    // to prevent infinite recursion from broadcast's local echo.
+    if (networkAdapter.isHost() && msg.from !== networkAdapter.getPeerId()) {
       networkAdapter.broadcast(PlatformEvents.PLAYER_READY, payload)
     }
     refresh()

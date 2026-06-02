@@ -95,16 +95,24 @@ onMounted(async () => {
 })
 
 async function handleCreateRoom(): Promise<void> {
-  const code = await roomStore.createRoom()
-  router.push(`/room/${code}`)
+  try {
+    const code = await roomStore.createRoom()
+    router.push(`/room/${code}`)
+  } catch {
+    // error is already set on roomStore.error by createRoom
+  }
 }
 
 async function handleJoinRoom(): Promise<void> {
   joinError.value = ''
   const result = validateRoomCode(joinCode.value)
   if (!result.ok) { joinError.value = result.error; return }
-  await roomStore.joinRoom(result.code)
-  router.push(`/room/${result.code}`)
+  try {
+    await roomStore.joinRoom(result.code)
+    router.push(`/room/${result.code}`)
+  } catch {
+    // error is already set on roomStore.error by joinRoom
+  }
 }
 
 const featuredGames = [
